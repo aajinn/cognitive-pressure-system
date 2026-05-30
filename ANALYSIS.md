@@ -1,8 +1,8 @@
-# Exam Set Akam: Full App Analysis
+# Cognitive Pressure System: Full App Analysis
 
 ## Overview
 
-**Name:** Exam Set Akam
+**Name:** Cognitive Pressure System
 **Tech:** Next.js 16.2.6 / React 19.2.4 / TypeScript / Tailwind v4 (CSS-only, no utility classes in JSX)
 **Purpose:** A single-page, client-only spaced-repetition quiz app for Software Engineering concepts using a custom SM-2 algorithm.
 

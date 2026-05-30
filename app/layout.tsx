@@ -15,8 +15,8 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Exam Set Akam",
-  description: "A spaced repetition quiz for mastering Software Engineering concepts",
+  title: "Cognitive Pressure System",
+  description: "A science-backed spaced repetition system for engineering exam mastery — leveraging cognitive load theory, interleaving, and metacognition",
 };
 
 export default function RootLayout({
