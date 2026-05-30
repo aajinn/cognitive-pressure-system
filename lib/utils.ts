@@ -1,4 +1,4 @@
-import type { Question, QType } from './types'
+import type { Question } from './types'
 import { END_MSGS, CORRECT_FEEDBACKS, WRONG_FEEDBACKS } from './constants'
  
 export function shuffle<T>(arr: T[]): T[] {
