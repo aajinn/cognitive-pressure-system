@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SE Quiz — Spaced Recall</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0d0d0f;
+  --surface:#17171a;
+  --surface2:#1f1f24;
+  --surface3:#28282f;
+  --border:#2e2e38;
+  --accent:#7c6af7;
+  --accent2:#a78bfa;
+  --green:#4ade80;
+  --red:#f87171;
+  --amber:#fbbf24;
+  --text:#f0effe;
+  --muted:#8884a8;
+  --faint:#3d3a54;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 20px 80px}
+/* noise overlay */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");opacity:.4;pointer-events:none;z-index:0}
+
+.wrap{width:100%;max-width:800px;position:relative;z-index:1}
+
+/* header */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:36px}
+.logo{font-size:24px;font-weight:800;letter-spacing:-.5px}
+.logo span{color:var(--accent)}
+.session-info{font-size:14px;color:var(--muted);font-family:'DM Mono',monospace;text-align:right}
+
+/* progress */
+.progress-track{height:5px;background:var(--border);border-radius:99px;margin-bottom:32px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+/* stats row */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:7px 6px;text-align:center}
+.stat-n{font-size:16px;font-weight:700;line-height:1}
+.stat-l{font-size:9px;color:var(--muted);margin-top:2px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:28px;padding:48px 44px;margin-bottom:20px;animation:cardIn .3s ease}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.q-meta{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.badge{font-size:11px;font-family:'DM Mono',monospace;padding:4px 11px;border-radius:99px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.badge-topic{background:var(--surface3);color:var(--accent2);border:1px solid var(--faint)}
+.badge-type{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.badge-repeat{background:#2d1f0f;color:var(--amber);border:1px solid #5a3d10}
+.recall-dot{width:7px;height:7px;border-radius:50%;margin-left:auto;flex-shrink:0}
+
+.q-text{font-size:22px;font-weight:600;line-height:1.7;margin-bottom:12px;color:var(--text)}
+.blank-span{display:inline-block;border-bottom:2px solid var(--accent);color:var(--accent);min-width:80px;padding:0 4px;font-family:'DM Mono',monospace}
+.hint{font-size:13px;color:var(--muted);margin-bottom:20px;font-family:'DM Mono',monospace}
+
+/* MCQ */
+.options{display:flex;flex-direction:column;gap:10px}
+.opt{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;font-size:16px;font-weight:500;color:var(--text);cursor:pointer;text-align:left;width:100%;transition:border-color .15s,background .15s;font-family:'Syne',sans-serif;line-height:1.4}
+.opt:hover:not(:disabled){border-color:var(--accent);background:var(--surface3);color:var(--accent2)}
+.opt.correct{border-color:var(--green)!important;background:#0d2018!important;color:var(--green)!important}
+.opt.wrong{border-color:var(--red)!important;background:#200d0d!important;color:var(--red)!important}
+.opt.reveal{border-color:var(--accent)!important;background:#1a1730!important;color:var(--accent2)!important}
+.opt:disabled{cursor:default}
+
+/* T/F */
+.tf-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tf-btn{padding:18px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);font-size:18px;font-weight:700;color:var(--text);cursor:pointer;font-family:'Syne',sans-serif;transition:border-color .15s,background .15s}
+.tf-btn:hover:not(:disabled){border-color:var(--accent);background:var(--surface3)}
+.tf-btn.correct{border-color:var(--green)!important;background:#0d2018!important;color:var(--green)!important}
+.tf-btn.wrong{border-color:var(--red)!important;background:#200d0d!important;color:var(--red)!important}
+.tf-btn:disabled{cursor:default}
+
+/* fill */
+.fill-wrap{display:flex;gap:8px;flex-wrap:wrap}
+.fill-inp{flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:16px;color:var(--text);outline:none;font-family:'DM Mono',monospace;transition:border-color .15s}
+.fill-inp:focus{border-color:var(--accent)}
+.fill-inp.correct{border-color:var(--green);background:#0d2018;color:var(--green)}
+.fill-inp.wrong{border-color:var(--red);background:#200d0d;color:var(--red)}
+.fill-inp:disabled{cursor:default}
+
+/* match */
+.match-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center}
+.match-left{background:var(--surface3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:15px;font-family:'DM Mono',monospace;color:var(--accent2)}
+.match-sel{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:15px;color:var(--text);font-family:'Syne',sans-serif;outline:none;width:100%;cursor:pointer;transition:border-color .15s}
+.match-sel:focus{border-color:var(--accent)}
+.match-sel.correct{border-color:var(--green);background:#0d2018;color:var(--green)}
+.match-sel.wrong{border-color:var(--red);background:#200d0d;color:var(--red)}
+.match-sel:disabled{cursor:default}
+
+/* feedback */
+.feedback{border-radius:14px;padding:16px 20px;font-size:15px;margin-top:18px;line-height:1.6;display:none;font-family:'DM Mono',monospace}
+.feedback.show{display:block;animation:cardIn .2s ease}
+.feedback.ok{background:#0d2018;border:1px solid #1a4a2a;color:#86efac}
+.feedback.bad{background:#200d0d;border:1px solid #4a1a1a;color:#fca5a5}
+
+/* action buttons */
+.actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.btn-check{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:opacity .15s}
+.btn-check:hover{opacity:.85}
+.btn-next{background:var(--surface3);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 28px;font-size:16px;font-weight:600;cursor:pointer;font-family:'Syne',sans-serif;transition:border-color .15s,background .15s}
+.btn-next:hover{border-color:var(--accent);background:var(--surface2)}
+.btn-skip{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:12px;padding:14px 22px;font-size:15px;cursor:pointer;font-family:'Syne',sans-serif;transition:color .15s}
+.btn-skip:hover{color:var(--text)}
+.btn-view{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:12px;padding:14px 22px;font-size:15px;cursor:pointer;font-family:'Syne',sans-serif;transition:color .15s,border-color .15s;margin-left:auto}
+.btn-view:hover{color:var(--accent2);border-color:var(--accent)}
+
+/* full Q&A modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;overflow-y:auto;padding:24px 16px 60px;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{max-width:800px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:24px;overflow:hidden}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
+.modal-title{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.modal-close{background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:'Syne',sans-serif}
+.modal-close:hover{border-color:var(--accent);color:var(--accent2)}
+.modal-filter{display:flex;gap:8px;padding:16px 28px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.filter-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:99px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
+.filter-btn:hover,.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.modal-body{padding:20px 28px;display:flex;flex-direction:column;gap:12px}
+.qa-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.qa-card-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.qa-card-q{padding:14px 16px;font-size:15px;font-weight:600;line-height:1.6;color:var(--text)}
+.qa-card-a{padding:12px 16px;background:var(--surface3);border-top:1px solid var(--border);font-size:14px;color:var(--green);font-weight:600;line-height:1.6}
+.qa-card-exp{padding:10px 16px;background:#0d0d0f;border-top:1px solid var(--border);font-size:13px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.6}
+.qa-num{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);margin-left:auto;flex-shrink:0}
+
+.btn-all-qa{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace;transition:color .15s,border-color .15s;white-space:nowrap}
+.btn-all-qa:hover{color:var(--accent2);border-color:var(--accent)}
+
+/* inline per-card Q&A panel */
+.qa-panel{display:none;margin-top:16px;background:var(--surface2);border:1px solid var(--faint);border-radius:16px;overflow:hidden}
+.qa-panel.show{display:block;animation:cardIn .2s ease}
+.qa-section{padding:16px 20px}
+.qa-section+.qa-section{border-top:1px solid var(--border)}
+.qa-label{font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.qa-content{font-size:15px;line-height:1.65;color:var(--text)}
+.qa-answer{font-size:15px;line-height:1.65;color:var(--green);font-weight:600}
+
+/* recall meter */
+.recall-bar{display:flex;gap:4px;margin-bottom:28px;align-items:center}
+.recall-label{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);margin-right:10px;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
+.recall-seg{flex:1;height:6px;border-radius:99px;background:var(--border)}
+.recall-seg.done{background:var(--green)}
+.recall-seg.due{background:var(--amber)}
+.recall-seg.new{background:var(--accent)}
+
+/* end screen */
+.end{text-align:center;padding:48px 24px}
+.end-pct{font-size:88px;font-weight:800;color:var(--accent2);line-height:1;margin-bottom:10px}
+.end-msg{font-size:17px;color:var(--muted);margin-bottom:36px}
+.end-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:28px}
+.review-list{text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px}
+.review-list h3{font-size:13px;color:var(--muted);margin-bottom:14px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+.review-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5}
+.review-item:last-child{border-bottom:none}
+.ri-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+
+.screen{display:none}
+.screen.active{display:block}
+
+/* ── MOBILE RESPONSIVE ─────────────────────────────────────────── */
+@media(max-width:600px){
+  body{padding:20px 14px 60px}
+  .wrap{max-width:100%}
+  .header{margin-bottom:24px}
+  .logo{font-size:20px}
+  .session-info{font-size:12px}
+  .stats{grid-template-columns:repeat(2,1fr);gap:6px}
+  .stat{padding:7px 6px}
+  .stat-n{font-size:14px}
+  .card{padding:22px 18px;border-radius:18px}
+  .q-text{font-size:17px}
+  .opt{font-size:15px;padding:14px 16px}
+  .tf-btn{font-size:16px;padding:16px}
+  .fill-inp{font-size:15px;padding:13px 14px;min-width:100%}
+  .match-row{grid-template-columns:1fr;gap:6px}
+  .match-left{font-size:13px}
+  .match-sel{font-size:14px}
+  .actions{flex-direction:column}
+  .btn-check,.btn-next,.btn-skip,.btn-view{width:100%;text-align:center;padding:15px}
+  .end-pct{font-size:72px}
+  .end-grid{grid-template-columns:repeat(3,1fr)}
+  .recall-label{display:none}
+  .modal-box{border-radius:16px}
+  .modal-header,.modal-body{padding:16px}
+  .modal-filter{padding:12px 16px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="logo">SE<span>Quiz</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn-all-qa" onclick="openAllQA()">📋 All Q&amp;A</button>
+      <div class="session-info" id="session-info">Session 1 · 0 done</div>
+    </div>
+  </div>
+
+  <!-- All Q&A Modal -->
+  <div class="modal-overlay" id="qa-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">All Questions &amp; Answers</span>
+        <button class="modal-close" onclick="closeAllQA()">✕ Close</button>
+      </div>
+      <div class="modal-filter" id="modal-filter"></div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Quiz screen -->
+  <div id="quiz-screen" class="screen active">
+    <div class="progress-track"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="s-done">0</div><div class="stat-l">Done</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--green)" id="s-correct">0</div><div class="stat-l">Correct</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--red)" id="s-wrong">0</div><div class="stat-l">Wrong</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--amber)" id="s-due">0</div><div class="stat-l">To review</div></div>
+    </div>
+
+    <div class="recall-bar">
+      <span class="recall-label">Recall deck</span>
+      <div id="recall-segs"></div>
+    </div>
+
+    <div id="q-area"></div>
+  </div>
+
+  <!-- End screen -->
+  <div id="end-screen" class="screen">
+    <div class="end">
+      <div class="end-pct" id="end-pct">0%</div>
+      <div class="end-msg" id="end-msg"></div>
+      <div class="end-grid">
+        <div class="stat"><div class="stat-n" id="e-correct" style="color:var(--green)">0</div><div class="stat-l">Correct</div></div>
+        <div class="stat"><div class="stat-n" id="e-wrong" style="color:var(--red)">0</div><div class="stat-l">Wrong</div></div>
+        <div class="stat"><div class="stat-n" id="e-total" style="color:var(--accent2)">0</div><div class="stat-l">Total</div></div>
+      </div>
+      <div class="review-list" id="review-list"></div>
+      <button class="btn-check" style="width:100%;padding:14px;font-size:15px" onclick="restart()">Restart with Spaced Repetition →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── ALL QUESTIONS ─────────────────────────────────────────────────────────────
+const ALL_Q = [
+  {id:0, topic:"CIS", mark:"2-mark", type:"fill",
+   q:"A Computer Information System collects, processes, stores, and _____ information for decision making.",
+   blanks:["distributes"], hint:"Think of the last step — getting info out to users."},
+
+  {id:1, topic:"Software Engineering", mark:"2-mark", type:"fill",
+   q:"Software Engineering applies _____ principles to develop reliable and efficient software economically.",
+   blanks:["engineering"], hint:"The name itself is the clue."},
+
+  {id:2, topic:"DFD", mark:"2-mark", type:"mcq",
+   q:"A Data Store in DFD is represented using:",
+   options:["A circle","Two parallel lines","A rectangle","An arrow"], answer:1},
+
+  {id:3, topic:"Testing", mark:"2-mark", type:"mcq",
+   q:"Alpha Testing is performed by:",
+   options:["End users","External testers","Internal testers","Client managers"], answer:2},
+
+  {id:4, topic:"Testing", mark:"2-mark", type:"fill",
+   q:"Unit Testing tests individual _____ or components independently and is usually done by developers.",
+   blanks:["modules"], hint:"Small pieces of code that do one job."},
+
+  {id:5, topic:"Metrics", mark:"2-mark", type:"tf",
+   q:"A metric is a qualitative measure used to measure software quality, complexity, cost, or productivity.",
+   answer:false, exp:"Metrics are QUANTITATIVE — they use numbers, not descriptive qualities."},
+
+  {id:6, topic:"Cyclomatic Complexity", mark:"2-mark", type:"fill",
+   q:"Cyclomatic Complexity formula: V(G) = E − N + _____P  (fill the number)",
+   blanks:["2"], hint:"A small single-digit integer."},
+
+  {id:7, topic:"Cohesion", mark:"2-mark", type:"mcq",
+   q:"Cohesion is the degree of relationship among functions _____ a module.",
+   options:["between","outside","inside","above"], answer:2},
+
+  {id:8, topic:"Coupling", mark:"2-mark", type:"tf",
+   q:"Coupling is the degree of dependency between modules.",
+   answer:true, exp:"Correct — coupling measures how much modules depend on each other."},
+
+  {id:9, topic:"Feasibility Study", mark:"2-mark", type:"mcq",
+   q:"Which of these is NOT a type of Feasibility Study?",
+   options:["Technical","Operational","Algorithmic","Schedule"], answer:2},
+
+  {id:10, topic:"SRS", mark:"2-mark", type:"fill",
+   q:"SRS stands for Software _____ Specification.",
+   blanks:["Requirement"], hint:"What does an SRS document?"},
+
+  {id:11, topic:"Brainstorming", mark:"2-mark", type:"tf",
+   q:"Brainstorming is a one-on-one interview technique used for requirement gathering.",
+   answer:false, exp:"Brainstorming is a GROUP discussion technique, not one-on-one."},
+
+  {id:12, topic:"Waterfall Model", mark:"2-mark", type:"mcq",
+   q:"In the Waterfall Model, a new phase begins only after:",
+   options:["Testing is done","Planning is complete","The previous phase is complete","A prototype is approved"], answer:2},
+
+  {id:13, topic:"Verification", mark:"2-mark", type:"mcq",
+   q:"Verification checks whether the software is built _____.",
+   options:["for the right users","correctly","fast enough","within budget"], answer:1},
+
+  {id:14, topic:"Validation", mark:"2-mark", type:"tf",
+   q:"Validation uses code execution and testing (dynamic testing).",
+   answer:true, exp:"Correct — Validation is dynamic: it runs the code to check the right product is built."},
+
+  {id:15, topic:"BVA", mark:"2-mark", type:"mcq",
+   q:"For input range 18–30, which set of values does Boundary Value Analysis test?",
+   options:["18, 20, 25, 30","17, 18, 19, 29, 30, 31","18, 24, 30","15, 20, 35"], answer:1},
+
+  {id:16, topic:"Functional Requirements", mark:"2-mark", type:"tf",
+   q:"Functional requirements describe WHAT a system should do, such as a login feature.",
+   answer:true, exp:"Correct — functional requirements describe system features and behaviors."},
+
+  {id:17, topic:"Non-Functional", mark:"2-mark", type:"mcq",
+   q:"Which is an example of a Non-Functional Requirement?",
+   options:["User login","Data export","System reliability","Report generation"], answer:2},
+
+  {id:18, topic:"COCOMO", mark:"2-mark", type:"fill",
+   q:"COCOMO is a software cost estimation model developed by Barry _____.",
+   blanks:["Boehm"], hint:"Rhymes with 'poem'."},
+
+  // 5-mark
+  {id:19, topic:"Verification vs Validation", mark:"5-mark", type:"match",
+   q:"Match each activity to Verification or Validation:",
+   pairs:[["Reviews & Inspections","Verification"],["Testing","Validation"],["Static testing","Verification"],["Dynamic testing","Validation"]]},
+
+  {id:20, topic:"Waterfall Model", mark:"5-mark", type:"mcq",
+   q:"Which is a disadvantage of the Waterfall Model?",
+   options:["Too much user involvement","Difficult to handle changing requirements","Too many iterations","No testing phase"], answer:1},
+
+  {id:21, topic:"Feasibility Study", mark:"5-mark", type:"mcq",
+   q:"Which type of feasibility checks if the project can be done with available technology?",
+   options:["Operational","Economic","Technical","Schedule"], answer:2},
+
+  {id:22, topic:"DFD Components", mark:"5-mark", type:"match",
+   q:"Match DFD symbols to their meanings:",
+   pairs:[["Rectangle","External Entity"],["Circle","Process"],["Open Rectangle","Data Store"],["Arrow","Data Flow"]]},
+
+  {id:23, topic:"Cyclomatic Complexity", mark:"5-mark", type:"fill",
+   q:"In V(G) = E − N + 2P: E = edges, N = nodes, P = _____ components.",
+   blanks:["connected"], hint:"How are the parts of the graph related to each other?"},
+
+  {id:24, topic:"Coupling Types", mark:"5-mark", type:"mcq",
+   q:"Which coupling type is the WORST (highest dependency)?",
+   options:["Data coupling","Stamp coupling","Common coupling","Content coupling"], answer:3},
+
+  {id:25, topic:"Coupling Types", mark:"5-mark", type:"mcq",
+   q:"Which coupling type is the BEST (lowest dependency)?",
+   options:["Content coupling","External coupling","Data coupling","Control coupling"], answer:2},
+
+  {id:26, topic:"Cohesion Types", mark:"5-mark", type:"mcq",
+   q:"Which cohesion type is the BEST?",
+   options:["Coincidental","Logical","Temporal","Functional"], answer:3},
+
+  {id:27, topic:"Cohesion Types", mark:"5-mark", type:"mcq",
+   q:"Which cohesion type is the WORST?",
+   options:["Sequential","Coincidental","Procedural","Communicational"], answer:1},
+
+  {id:28, topic:"BVA", mark:"5-mark", type:"tf",
+   q:"In BVA for range 18–30, the value 20 is a boundary test value.",
+   answer:false, exp:"No — BVA tests: 17, 18, 19 (near min) and 29, 30, 31 (near max). 20 is not a boundary."},
+
+  {id:29, topic:"Failure Occurrence", mark:"5-mark", type:"mcq",
+   q:"The Bathtub Curve in reliability shows:",
+   options:["Constant failure rate throughout","High early failures, then stable, then wear-out","Only increasing failures","Only decreasing failures"], answer:1},
+
+  // 15-mark
+  {id:30, topic:"Iterative vs RAD", mark:"15-mark", type:"tf",
+   q:"The RAD Model uses prototypes and has HIGH user involvement compared to the Iterative Model.",
+   answer:true, exp:"Correct — RAD is prototype-based with high user involvement, while Iterative has less user involvement and more planning."},
+
+  {id:31, topic:"Iterative vs RAD", mark:"15-mark", type:"mcq",
+   q:"Which model is more suitable for small projects with fast delivery requirements?",
+   options:["Iterative Model","Waterfall Model","RAD Model","Spiral Model"], answer:2},
+
+  {id:32, topic:"Requirement Elicitation", mark:"15-mark", type:"fill",
+   q:"FAST stands for Facilitated Application _____ Technique.",
+   blanks:["Specification"], hint:"What does FAST produce as output?"},
+
+  {id:33, topic:"Requirement Elicitation", mark:"15-mark", type:"mcq",
+   q:"QFD in requirement elicitation stands for:",
+   options:["Quality Function Deployment","Quick Feature Design","Quantified Functional Data","Query Form Design"], answer:0},
+
+  {id:34, topic:"Design Strategies", mark:"15-mark", type:"mcq",
+   q:"Which design strategy starts from the main system and breaks it into subsystems?",
+   options:["Bottom-up","Hybrid","Top-down","Modular"], answer:2},
+
+  {id:35, topic:"Design Strategies", mark:"15-mark", type:"mcq",
+   q:"A Hybrid Design Strategy is a combination of:",
+   options:["RAD and Waterfall","Top-down and Bottom-up","Modular and Iterative","Structured and Object-Oriented"], answer:1},
+
+  {id:36, topic:"Path Testing", mark:"15-mark", type:"fill",
+   q:"Path Testing is based on drawing a _____ Flow Graph to find all independent paths.",
+   blanks:["Control"], hint:"It's about how control moves through the program."},
+
+  {id:37, topic:"Data Flow Testing", mark:"15-mark", type:"mcq",
+   q:"Data Flow Testing primarily detects:",
+   options:["Network errors","Memory leaks","Undefined and unused variables","Syntax errors"], answer:2},
+
+  {id:38, topic:"Testing Levels", mark:"15-mark", type:"match",
+   q:"Order these testing levels from lowest to highest:",
+   pairs:[["1st level","Unit Testing"],["2nd level","Integration Testing"],["3rd level","System Testing"],["4th level","Acceptance Testing"]]},
+
+  {id:39, topic:"Testing Levels", mark:"15-mark", type:"mcq",
+   q:"Which testing level checks interaction between modules?",
+   options:["Unit Testing","Integration Testing","System Testing","Acceptance Testing"], answer:1},
+];
+
+// ── SPACED REPETITION ENGINE ──────────────────────────────────────────────────
+// Each question gets: interval (how many steps before re-shown), nextAt (step counter), easiness, correct streak
+const SM = {}; // id -> {interval, nextAt, ease, streak, correct, wrong}
+ALL_Q.forEach(q=>{
+  SM[q.id]={interval:0, nextAt:0, ease:2.5, streak:0, correct:0, wrong:0, seen:false};
+});
+
+let step = 0;       // global step counter (increments each question answered)
+let sessionDone = 0;
+let sessionCorrect = 0;
+let sessionWrong = 0;
+let wrongItems = []; // {q, userAns, correctAns}
+let currentQ = null;
+let answered = false;
+let queue = []; // ordered list of q ids for this session
+
+function getDueQueue(){
+  // Build queue: first questions due at current step, then new ones
+  let due = ALL_Q.filter(q=> SM[q.id].nextAt <= step && SM[q.id].seen).map(q=>q.id);
+  let fresh = ALL_Q.filter(q=> !SM[q.id].seen).map(q=>q.id);
+  // Shuffle each group
+  due = shuffle(due);
+  fresh = shuffle(fresh);
+  return [...due, ...fresh];
+}
+
+function buildQueue(){
+  queue = getDueQueue();
+}
+
+function shuffle(arr){return [...arr].sort(()=>Math.random()-.5)}
+
+function nextCard(){
+  // Rebuild queue each time — picks due items first
+  buildQueue();
+  if(queue.length === 0){ showEnd(); return; }
+  // All seen and none due? Show end if all have been seen at least once with streak>=1
+  let allSeen = ALL_Q.every(q=>SM[q.id].seen);
+  let noneDue = ALL_Q.every(q=>SM[q.id].nextAt > step);
+  if(allSeen && noneDue){ showEnd(); return; }
+  currentQ = ALL_Q.find(q=>q.id === queue[0]);
+  answered = false;
+  renderCard();
+  updateStats();
+}
+
+function recordResult(qid, correct){
+  const s = SM[qid];
+  s.seen = true;
+  sessionDone++;
+  if(correct){
+    sessionCorrect++;
+    s.correct++;
+    s.streak++;
+    // SM2-lite: grow interval
+    if(s.streak === 1) s.interval = 1;
+    else if(s.streak === 2) s.interval = 3;
+    else s.interval = Math.round(s.interval * s.ease);
+    s.ease = Math.min(2.5 + 0.1*(s.streak-1), 3.0);
+  } else {
+    sessionWrong++;
+    s.wrong++;
+    s.streak = 0;
+    s.interval = 1; // show again soon
+    s.ease = Math.max(s.ease - 0.2, 1.3);
+  }
+  s.nextAt = step + s.interval;
+  step++;
+}
+
+// ── RENDERING ─────────────────────────────────────────────────────────────────
+function renderCard(){
+  const q = currentQ;
+  const s = SM[q.id];
+  const isRepeat = s.seen && s.streak === 0;
+  const typeLabel = {mcq:"Multiple choice",tf:"True / False",fill:"Fill in blank",match:"Match columns"}[q.type];
+
+  // recall dot color
+  let dotColor = "var(--accent)"; // new
+  if(s.seen){ dotColor = s.streak > 0 ? "var(--green)" : "var(--amber)"; }
+
+  let html = `<div class="card">
+    <div class="q-meta">
+      <span class="badge badge-topic">${q.topic}</span>
+      <span class="badge badge-type">${q.mark}</span>
+      <span class="badge badge-type">${typeLabel}</span>
+      ${isRepeat ? '<span class="badge badge-repeat">↩ Review</span>' : ''}
+      <span class="recall-dot" style="background:${dotColor}"></span>
+    </div>
+    <div class="q-text">${formatQ(q)}</div>
+    ${q.hint ? `<div class="hint">Hint: ${q.hint}</div>` : ''}
+    ${renderInput(q)}
+    <div class="feedback" id="fb"></div>
+    <div class="qa-panel" id="qa-panel">
+      <div class="qa-section">
+        <div class="qa-label">Question</div>
+        <div class="qa-content">${q.q}</div>
+      </div>
+      <div class="qa-section">
+        <div class="qa-label">Answer</div>
+        <div class="qa-answer">${getFullAnswer(q)}</div>
+      </div>
+      ${q.exp ? `<div class="qa-section"><div class="qa-label">Explanation</div><div class="qa-content" style="color:var(--muted)">${q.exp}</div></div>` : ''}
+    </div>
+  </div>
+  <div class="actions" id="actions">${renderActions(q)}</div>`;
+
+  document.getElementById('q-area').innerHTML = html;
+  bindInputEvents(q);
+  updateRecallBar();
+  updateProgress();
+  document.getElementById('session-info').textContent = `Step ${step+1} · ${sessionDone} done`;
+}
+
+function formatQ(q){
+  if(q.type !== 'fill') return q.q;
+  let text = q.q;
+  q.blanks.forEach(()=>{ text = text.replace('_____','<span class="blank-span">?</span>'); });
+  return text;
+}
+
+function getFullAnswer(q){
+  if(q.type === 'mcq') return q.options[q.answer];
+  if(q.type === 'tf') return q.answer ? 'True' : 'False';
+  if(q.type === 'fill') return q.blanks.join(' / ');
+  if(q.type === 'match') return q.pairs.map(p=>`${p[0]} → ${p[1]}`).join('<br>');
+  return '';
+}
+
+function renderInput(q){
+  if(q.type === 'mcq'){
+    return `<div class="options" id="opts">`+
+      q.options.map((o,i)=>`<button class="opt" data-i="${i}">${o}</button>`).join('')+
+    `</div>`;
+  }
+  if(q.type === 'tf'){
+    return `<div class="tf-row">
+      <button class="tf-btn" id="tf-true">True</button>
+      <button class="tf-btn" id="tf-false">False</button>
+    </div>`;
+  }
+  if(q.type === 'fill'){
+    const inputs = q.blanks.map((_,i)=>`<input class="fill-inp" id="fi${i}" placeholder="Blank ${i+1}…" autocomplete="off"/>`).join('');
+    return `<div class="fill-wrap">${inputs}</div>`;
+  }
+  if(q.type === 'match'){
+    const rights = shuffle(q.pairs.map(p=>p[1]));
+    return q.pairs.map((p,i)=>`
+      <div class="match-row">
+        <div class="match-left">${p[0]}</div>
+        <select class="match-sel" id="ms${i}">
+          <option value="">— select —</option>
+          ${rights.map(r=>`<option value="${r}">${r}</option>`).join('')}
+        </select>
+      </div>`).join('');
+  }
+}
+
+function renderActions(q){
+  if(q.type === 'fill' || q.type === 'match'){
+    return `<button class="btn-check" id="btn-check">Check Answer</button>
+            <button class="btn-skip" id="btn-skip">Skip →</button>
+            <button class="btn-view" id="btn-view">👁 View Answer</button>`;
+  }
+  return `<button class="btn-next" id="btn-next" style="display:none">Next →</button>
+          <button class="btn-skip" id="btn-skip">Skip →</button>
+          <button class="btn-view" id="btn-view">👁 View Answer</button>`;
+}
+
+function bindInputEvents(q){
+  // MCQ
+  if(q.type === 'mcq'){
+    document.querySelectorAll('.opt').forEach(btn=>{
+      btn.addEventListener('click', function(){
+        if(answered) return;
+        const i = parseInt(this.dataset.i);
+        handleMCQ(q, i);
+      });
+    });
+  }
+  // TF
+  if(q.type === 'tf'){
+    const t = document.getElementById('tf-true');
+    const f = document.getElementById('tf-false');
+    if(t) t.addEventListener('click', ()=>{ if(!answered) handleTF(q, true); });
+    if(f) f.addEventListener('click', ()=>{ if(!answered) handleTF(q, false); });
+  }
+  // Fill
+  if(q.type === 'fill'){
+    const chk = document.getElementById('btn-check');
+    if(chk) chk.addEventListener('click', ()=>{ if(!answered) handleFill(q); });
+    q.blanks.forEach((_,i)=>{
+      const inp = document.getElementById('fi'+i);
+      if(inp) inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && !answered) handleFill(q); });
+    });
+  }
+  // Match
+  if(q.type === 'match'){
+    const chk = document.getElementById('btn-check');
+    if(chk) chk.addEventListener('click', ()=>{ if(!answered) handleMatch(q); });
+  }
+  // Skip always
+  const skipBtn = document.getElementById('btn-skip');
+  if(skipBtn) skipBtn.addEventListener('click', ()=>{ skipQ(); });
+  // Next (for MCQ/TF revealed after answer)
+  const nextBtn = document.getElementById('btn-next');
+  if(nextBtn) nextBtn.addEventListener('click', ()=>{ nextCard(); });
+  // View Answer toggle
+  const viewBtn = document.getElementById('btn-view');
+  if(viewBtn) viewBtn.addEventListener('click', ()=>{
+    const panel = document.getElementById('qa-panel');
+    if(!panel) return;
+    const open = panel.classList.toggle('show');
+    viewBtn.textContent = open ? '✕ Hide Answer' : '👁 View Answer';
+  });
+}
+
+// ── ANSWER HANDLERS ───────────────────────────────────────────────────────────
+function handleMCQ(q, chosen){
+  answered = true;
+  const correct = chosen === q.answer;
+  document.querySelectorAll('.opt').forEach((b,i)=>{
+    b.disabled = true;
+    if(i === q.answer) b.classList.add('correct');
+    else if(i === chosen && !correct) b.classList.add('wrong');
+  });
+  showFeedback(correct, correct ? `✓ Correct! "${q.options[q.answer]}" is right.` : `✗ Correct answer: "${q.options[q.answer]}"`);
+  recordResult(q.id, correct);
+  if(!correct) logWrong(q, q.options[chosen], q.options[q.answer]);
+  showNextBtn();
+  updateStats();
+}
+
+function handleTF(q, selected){
+  answered = true;
+  const correct = selected === q.answer;
+  const tBtn = document.getElementById('tf-true');
+  const fBtn = document.getElementById('tf-false');
+  tBtn.disabled = true; fBtn.disabled = true;
+  // Always show the correct answer in green
+  if(q.answer === true) tBtn.classList.add('correct');
+  else if(selected === true) tBtn.classList.add('wrong');
+  if(q.answer === false) fBtn.classList.add('correct');
+  else if(selected === false) fBtn.classList.add('wrong');
+  const expTxt = q.exp ? ' ' + q.exp : '';
+  showFeedback(correct, (correct?'✓ Correct!':'✗ Wrong — it is '+(q.answer?'True':'False')+'.') + expTxt);
+  recordResult(q.id, correct);
+  if(!correct) logWrong(q, selected?'True':'False', q.answer?'True':'False');
+  showNextBtn();
+  updateStats();
+}
+
+function handleFill(q){
+  answered = true;
+  let allCorrect = true;
+  let userAnswers = [];
+  q.blanks.forEach((ans, i)=>{
+    const inp = document.getElementById('fi'+i);
+    if(!inp) return;
+    const val = inp.value.trim().toLowerCase();
+    const exp = ans.toLowerCase();
+    const ok = val.length > 0 && (val === exp || exp.includes(val) || val.includes(exp));
+    inp.disabled = true;
+    inp.classList.add(ok ? 'correct' : 'wrong');
+    userAnswers.push(inp.value.trim());
+    if(!ok) allCorrect = false;
+  });
+  showFeedback(allCorrect,
+    allCorrect ? `✓ Correct! Answer: ${q.blanks.join(' / ')}` : `✗ Answer: ${q.blanks.join(' / ')}`);
+  recordResult(q.id, allCorrect);
+  if(!allCorrect) logWrong(q, userAnswers.join(', '), q.blanks.join(' / '));
+  // Change check btn to next
+  const chk = document.getElementById('btn-check');
+  if(chk){ chk.textContent = 'Next →'; chk.onclick = ()=>nextCard(); }
+  const skipBtn = document.getElementById('btn-skip');
+  if(skipBtn) skipBtn.style.display = 'none';
+  updateStats();
+}
+
+function handleMatch(q){
+  answered = true;
+  let allCorrect = true;
+  let wrongPairs = [];
+  q.pairs.forEach((p,i)=>{
+    const sel = document.getElementById('ms'+i);
+    if(!sel) return;
+    const ok = sel.value === p[1];
+    sel.disabled = true;
+    sel.classList.add(ok ? 'correct' : 'wrong');
+    if(!ok){ allCorrect = false; wrongPairs.push(`${p[0]} → ${p[1]}`); }
+  });
+  const correctList = q.pairs.map(p=>`${p[0]} → ${p[1]}`).join(' | ');
+  showFeedback(allCorrect,
+    allCorrect ? `✓ All matched correctly!` : `✗ Correct: ${correctList}`);
+  recordResult(q.id, allCorrect);
+  if(!allCorrect) logWrong(q, 'wrong selections', correctList);
+  const chk = document.getElementById('btn-check');
+  if(chk){ chk.textContent = 'Next →'; chk.onclick = ()=>nextCard(); }
+  const skipBtn = document.getElementById('btn-skip');
+  if(skipBtn) skipBtn.style.display = 'none';
+  updateStats();
+}
+
+function skipQ(){
+  // Don't count skip as wrong, but push it back to the deck
+  SM[currentQ.id].seen = true;
+  SM[currentQ.id].nextAt = step + 1;
+  step++;
+  sessionDone++;
+  nextCard();
+}
+
+function showNextBtn(){
+  const nb = document.getElementById('btn-next');
+  const sb = document.getElementById('btn-skip');
+  if(nb){ nb.style.display = 'inline-block'; }
+  if(sb){ sb.style.display = 'none'; }
+}
+
+function showFeedback(ok, msg){
+  const fb = document.getElementById('fb');
+  if(!fb) return;
+  fb.className = 'feedback show ' + (ok ? 'ok' : 'bad');
+  fb.innerHTML = msg;
+}
+
+function logWrong(q, user, correct){
+  wrongItems.push({topic:q.topic, q:q.q.substring(0,80)+'…', user, correct});
+}
+
+// ── UI UPDATES ────────────────────────────────────────────────────────────────
+function updateStats(){
+  document.getElementById('s-done').textContent = sessionDone;
+  document.getElementById('s-correct').textContent = sessionCorrect;
+  document.getElementById('s-wrong').textContent = sessionWrong;
+  const due = ALL_Q.filter(q=>SM[q.id].seen && SM[q.id].nextAt <= step && SM[q.id].streak === 0).length;
+  document.getElementById('s-due').textContent = due;
+}
+
+function updateProgress(){
+  const mastered = ALL_Q.filter(q=>SM[q.id].streak >= 2).length;
+  const pct = Math.round((mastered / ALL_Q.length) * 100);
+  document.getElementById('prog').style.width = pct + '%';
+}
+
+function updateRecallBar(){
+  const segs = document.getElementById('recall-segs');
+  if(!segs) return;
+  segs.style.display = 'flex';
+  segs.style.flex = '1';
+  segs.style.gap = '3px';
+  segs.innerHTML = ALL_Q.map(q=>{
+    const s = SM[q.id];
+    let cls = 'recall-seg';
+    if(!s.seen) cls += ' new';
+    else if(s.streak >= 2) cls += ' done';
+    else cls += ' due';
+    return `<div class="${cls}" title="${q.topic}"></div>`;
+  }).join('');
+}
+
+// ── END ───────────────────────────────────────────────────────────────────────
+function showEnd(){
+  document.getElementById('quiz-screen').classList.remove('active');
+  const end = document.getElementById('end-screen');
+  end.classList.add('active');
+  const pct = sessionDone ? Math.round((sessionCorrect/sessionDone)*100) : 0;
+  document.getElementById('end-pct').textContent = pct + '%';
+  document.getElementById('e-correct').textContent = sessionCorrect;
+  document.getElementById('e-wrong').textContent = sessionWrong;
+  document.getElementById('e-total').textContent = sessionDone;
+
+  const msgs = [[90,'Outstanding — you know this material cold.'],[70,'Solid! Review the ones below.'],[50,'Good effort. Focus on the review list.'],[0,'Keep going — repetition builds recall.']];
+  const m = msgs.find(([t])=>pct>=t);
+  document.getElementById('end-msg').textContent = m[1];
+
+  let rl = document.getElementById('review-list');
+  if(wrongItems.length === 0){
+    rl.innerHTML = '<h3>Review list</h3><div style="color:var(--green);font-size:13px;font-family:\'DM Mono\',monospace;padding:8px 0">Perfect session — nothing to review!</div>';
+  } else {
+    rl.innerHTML = '<h3>Review these</h3>' + wrongItems.map(w=>`
+      <div class="review-item">
+        <div class="ri-dot" style="background:var(--red)"></div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:3px">${w.topic}</div>
+          <div style="color:var(--text);margin-bottom:2px">${w.q}</div>
+          <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--green)">✓ ${w.correct}</div>
+        </div>
+      </div>`).join('');
+  }
+}
+
+// ── ALL Q&A MODAL ─────────────────────────────────────────────────────────────
+let activeFilter = 'all';
+
+function openAllQA(){
+  activeFilter = 'all';
+  renderModalFilter();
+  renderModalBody();
+  document.getElementById('qa-modal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAllQA(){
+  document.getElementById('qa-modal').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// Close on backdrop click
+document.getElementById('qa-modal').addEventListener('click', function(e){
+  if(e.target === this) closeAllQA();
+});
+
+function renderModalFilter(){
+  const marks = ['all', ...new Set(ALL_Q.map(q=>q.mark))];
+  document.getElementById('modal-filter').innerHTML = marks.map(m=>
+    `<button class="filter-btn${m===activeFilter?' active':''}" onclick="setFilter('${m}')">${m==='all'?'All':m}</button>`
+  ).join('');
+}
+
+function setFilter(mark){
+  activeFilter = mark;
+  renderModalFilter();
+  renderModalBody();
+}
+
+function renderModalBody(){
+  const list = activeFilter === 'all' ? ALL_Q : ALL_Q.filter(q=>q.mark===activeFilter);
+  document.getElementById('modal-body').innerHTML = list.map((q,i)=>{
+    const ans = getFullAnswer(q);
+    const expHtml = q.exp ? `<div class="qa-card-exp">💡 ${q.exp}</div>` : '';
+    const hintHtml = q.hint ? `<div class="qa-card-exp">Hint: ${q.hint}</div>` : '';
+    return `<div class="qa-card">
+      <div class="qa-card-head">
+        <span class="badge badge-topic">${q.topic}</span>
+        <span class="badge badge-type">${q.mark}</span>
+        <span class="badge badge-type">${{mcq:'MCQ',tf:'T/F',fill:'Fill',match:'Match'}[q.type]}</span>
+        <span class="qa-num">#${q.id+1}</span>
+      </div>
+      <div class="qa-card-q">${q.q}</div>
+      <div class="qa-card-a">✓ ${ans}</div>
+      ${expHtml}${hintHtml}
+    </div>`;
+  }).join('');
+}
+
+function restart(){
+  sessionDone = 0; sessionCorrect = 0; sessionWrong = 0;
+  wrongItems = [];
+  step = 0;
+  answered = false;
+  // Reset SM for fresh start
+  ALL_Q.forEach(q=>{ SM[q.id]={interval:0, nextAt:0, ease:2.5, streak:0, correct:0, wrong:0, seen:false}; });
+  document.getElementById('end-screen').classList.remove('active');
+  document.getElementById('quiz-screen').classList.add('active');
+  nextCard();
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+nextCard();
+</script>
+</body>
+</html>
