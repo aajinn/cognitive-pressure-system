@@ -1,18 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
 import type { Question, McqHighlight, TfHighlight, FeedbackState, Confidence, Difficulty } from '@/lib/types'
 import { TYPE_LABEL } from '@/lib/constants'
-import { formatQHtml, getDotColor, getFullAnswer } from '@/lib/utils'
+import { formatQHtml } from '@/lib/utils'
 
-import MCQInput from './MCQInput'
-import TFInput from './TFInput'
-import FillInput from './FillInput'
 import MatchInput from './MatchInput'
-import RecallInput from './RecallInput'
-import ExplainInput from './ExplainInput'
-import AbstractInput from './AbstractInput'
-import AnalogyInput from './AnalogyInput'
 
 interface QuestionCardProps {
   question: Question
@@ -92,37 +84,6 @@ function currentInput(q: Question, fillValues: string[], matchValues: string[], 
   }
 }
 
-function renderInput(question: Question, props: QuestionCardProps) {
-  const { answered, mcqHighlight, tfHighlight, fillHighlight, matchHighlight, recallHighlight, abstractHighlight, analogyHighlight, explainKeyTermHighlights } = props
-
-  switch (question.type) {
-    case 'mcq':
-      return (
-        <div className="mcq-premium">
-          <MCQInput options={question.options!} highlight={mcqHighlight} disabled={answered} onSelect={props.onMCQ} />
-        </div>
-      )
-    case 'tf':
-      return <TFInput highlight={tfHighlight} disabled={answered} onSelect={props.onTF} />
-    case 'fill':
-      return <FillInput blanks={question.blanks!} values={props.fillValues} highlight={fillHighlight} disabled={answered} onChange={props.onFillChange} onEnter={props.onFillEnter} />
-    case 'match':
-      return props.shuffledMatchRights ? (
-        <MatchInput pairs={question.pairs!} values={props.matchValues} highlight={matchHighlight} disabled={answered} onChange={props.onMatchChange} />
-      ) : null
-    case 'recall':
-      return <RecallInput value={props.recallValue} highlight={recallHighlight} disabled={answered} onChange={props.onRecallChange} onEnter={props.onRecallEnter} />
-    case 'explain': case 'transfer':
-      return <ExplainInput value={props.explainValue} keyTerms={question.keyTerms!} disabled={answered} keyTermHighlights={explainKeyTermHighlights} onChange={props.onExplainChange} onEnter={props.onExplainEnter} />
-    case 'reconstruct':
-      return <FillInput blanks={question.blanks!} values={props.fillValues} highlight={fillHighlight} disabled={answered} onChange={props.onFillChange} onEnter={props.onFillEnter} />
-    case 'abstract':
-      return <AbstractInput examples={question.examples!} value={props.abstractValue} highlight={abstractHighlight} disabled={answered} onChange={props.onAbstractChange} onEnter={props.onAbstractEnter} />
-    case 'analogy':
-      return <AnalogyInput value={props.analogyValue} disabled={answered} onChange={props.onAnalogyChange} onEnter={props.onAnalogyEnter} />
-  }
-}
-
 function charCount(q: Question, props: QuestionCardProps): number {
   return currentInput(q, props.fillValues, props.matchValues, props.recallValue, props.explainValue, props.abstractValue, props.analogyValue).length
 }
@@ -135,7 +96,7 @@ const CONFIDENCE_LEVELS: { value: Confidence; label: string; sub: string }[] = [
 ]
 
 export default function QuestionCard(props: QuestionCardProps) {
-  const { question, answered, feedback, afterAnswer, xp: totalXp, knowledgeGain: gain } = props
+  const { question, answered, feedback, afterAnswer } = props
 
   const hasTextInput = question.type === 'fill' || question.type === 'reconstruct' || question.type === 'recall' || question.type === 'explain' || question.type === 'transfer' || question.type === 'abstract' || question.type === 'analogy'
   const textInputLen = charCount(question, props)

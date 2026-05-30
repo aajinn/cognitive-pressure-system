@@ -42,10 +42,18 @@ function persistState(sm: Record<number, SMEntry>, step: number) {
 }
 
 export default function QuizContainer() {
-  const smRef = useRef<Record<number, SMEntry>>(createSM(ALL_Q))
-  const stepRef = useRef(0)
+  const [initial] = useState(() => {
+    const saved = loadState()
+    return saved
+  })
+  const smRef = useRef<Record<number, SMEntry>>({...initial.sm})
+  const stepRef = useRef(initial.step)
   const queueRef = useRef<number[]>([])
-  const [showWelcome, setShowWelcome] = useState(false)
+  const [smSnapshot, setSmSnapshot] = useState<Record<number, SMEntry>>(() => ({...initial.sm}))
+  const [step, setStep] = useState(initial.step)
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try { return !localStorage.getItem(WELCOME_KEY) } catch { return false }
+  })
 
   const [screen, setScreen] = useState<QuizScreen>('quiz')
   const [currentQ, setCurrentQ] = useState<Question | null>(null)
@@ -92,12 +100,12 @@ export default function QuizContainer() {
   const [genFeedback, setGenFeedback] = useState<FeedbackState | null>(null)
 
   const dueCount = useMemo(
-    () => computeDueCount(ALL_Q, smRef.current, stepRef.current),
-    [sessionDone],
+    () => computeDueCount(ALL_Q, smSnapshot, step),
+    [smSnapshot, step],
   )
   const masteredCount = useMemo(
-    () => computeMasteredCount(ALL_Q, smRef.current),
-    [sessionDone],
+    () => computeMasteredCount(ALL_Q, smSnapshot),
+    [smSnapshot],
   )
   const progressPct = useMemo(
     () => Math.round((masteredCount / ALL_Q.length) * 100),
@@ -106,24 +114,24 @@ export default function QuizContainer() {
 
   const recallSegs: RecallSeg[] = useMemo(() => {
     return ALL_Q.map(q => {
-      const s = smRef.current[q.id]
+      const s = smSnapshot[q.id]
       let cls = 'recall-seg'
       if (!s.seen) cls += ' new'
       else if (s.streak >= 2) cls += ' done'
       else cls += ' due'
       return { cls, title: q.topic }
     })
-  }, [sessionDone])
+  }, [smSnapshot])
 
   const isRepeat = currentQ
-    ? smRef.current[currentQ.id]?.seen && smRef.current[currentQ.id]?.streak === 0
+    ? smSnapshot[currentQ.id]?.seen && smSnapshot[currentQ.id]?.streak === 0
     : false
 
-  const currentSeen = currentQ ? smRef.current[currentQ.id]?.seen : false
-  const currentStreak = currentQ ? smRef.current[currentQ.id]?.streak : 0
+  const currentSeen = currentQ ? smSnapshot[currentQ.id]?.seen : false
+  const currentStreak = currentQ ? smSnapshot[currentQ.id]?.streak : 0
   const maxStreak = useMemo(
-    () => Math.max(...ALL_Q.map(q => smRef.current[q.id]?.streak ?? 0)),
-    [sessionDone],
+    () => Math.max(...ALL_Q.map(q => smSnapshot[q.id]?.streak ?? 0)),
+    [smSnapshot],
   )
 
   const shuffledMatchRights = useMemo(() => {
@@ -140,12 +148,12 @@ export default function QuizContainer() {
 
   const confidenceTrend = useMemo(() => {
     if (!currentQ) return ''
-    const s = smRef.current[currentQ.id]
+    const s = smSnapshot[currentQ.id]
     if (!s?.seen) return '✦ New'
     if (s.streak >= 3) return '↑ Improving'
     if (s.streak >= 1) return '↗ Building'
     return '→ Reviewing'
-  }, [currentQ, sessionDone])
+  }, [currentQ, smSnapshot])
 
   const topicPath = useMemo(() => {
     if (!currentQ) return ''
@@ -164,7 +172,7 @@ export default function QuizContainer() {
   const contextReasons = useMemo(() => {
     if (!currentQ) return []
     const reasons: string[] = []
-    const s = smRef.current[currentQ.id]
+    const s = smSnapshot[currentQ.id]
     if (s?.wrong && s.wrong > 0) {
       reasons.push(`You missed this ${s.wrong} time${s.wrong > 1 ? 's' : ''} before`)
     }
@@ -179,7 +187,7 @@ export default function QuizContainer() {
       reasons.push('Scheduled for review — optimal timing for retention')
     }
     return reasons
-  }, [currentQ, wrongItems, sessionDone])
+  }, [currentQ, wrongItems, smSnapshot])
 
   const relatedTopics = useMemo(() => {
     if (!currentQ) return []
@@ -323,12 +331,14 @@ export default function QuizContainer() {
   }, [])
 
   useEffect(() => {
-    const saved = loadState()
-    smRef.current = saved.sm
-    stepRef.current = saved.step
-    if (!localStorage.getItem(WELCOME_KEY)) setShowWelcome(true)
     nextCard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    setSmSnapshot({...smRef.current})
+    setStep(stepRef.current)
+  }, [sessionDone])
 
   const handleDismissWelcome = useCallback(() => {
     try { localStorage.setItem(WELCOME_KEY, '1') } catch {}
@@ -595,7 +605,7 @@ export default function QuizContainer() {
 
   return (
     <div className="wrap">
-      <Header step={stepRef.current} done={sessionDone} onOpenQA={() => { setModalOpen(true); setModalFilter('all') }} />
+      <Header done={sessionDone} onOpenQA={() => { setModalOpen(true); setModalFilter('all') }} />
 
       <AllQAModal
         open={modalOpen}
