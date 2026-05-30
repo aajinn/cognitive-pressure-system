@@ -1,8 +1,8 @@
-# SE Quiz -- Spaced Recall: Full App Analysis
+# Exam Set Akam: Full App Analysis
 
 ## Overview
 
-**Name:** SE Quiz -- Spaced Recall
+**Name:** Exam Set Akam
 **Tech:** Next.js 16.2.6 / React 19.2.4 / TypeScript / Tailwind v4 (CSS-only, no utility classes in JSX)
 **Purpose:** A single-page, client-only spaced-repetition quiz app for Software Engineering concepts using a custom SM-2 algorithm.
 

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Syne, DM_Mono } from "next/font/google";
+import { Lexend, DM_Mono } from "next/font/google";
 import "./globals.css";
 
-const syne = Syne({
+const lexend = Lexend({
   subsets: ["latin"],
-  variable: "--font-syne",
+  variable: "--font-lexend",
 });
 
 const dmMono = DM_Mono({
@@ -15,8 +15,8 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SE Quiz — Spaced Recall",
-  description: "A spaced repetition quiz for Software Engineering concepts",
+  title: "Exam Set Akam",
+  description: "A spaced repetition quiz for mastering Software Engineering concepts",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${syne.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${lexend.variable} ${dmMono.variable}`}>
       <body>{children}</body>
     </html>
   );
