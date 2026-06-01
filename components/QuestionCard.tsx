@@ -1,6 +1,6 @@
 'use client'
 
-import type { Question, McqHighlight, TfHighlight, FeedbackState, Confidence, Difficulty } from '@/lib/types'
+import type { Question, McqHighlight, TfHighlight, FeedbackState, Difficulty } from '@/lib/types'
 import { TYPE_LABEL } from '@/lib/constants'
 import { formatQHtml } from '@/lib/utils'
 
@@ -49,9 +49,6 @@ interface QuestionCardProps {
   masteryPct: number
   questionPosition: string
   difficulty: Difficulty
-  confidenceTrend: string
-  confidence: Confidence | null
-  onConfidenceChange: (c: Confidence) => void
   xp: number
   knowledgeGain: number
   showHintReveal: boolean
@@ -88,13 +85,6 @@ function charCount(q: Question, props: QuestionCardProps): number {
   return currentInput(q, props.fillValues, props.matchValues, props.recallValue, props.explainValue, props.abstractValue, props.analogyValue).length
 }
 
-const CONFIDENCE_LEVELS: { value: Confidence; label: string; sub: string }[] = [
-  { value: 'guessing', label: 'Guessing', sub: 'No idea' },
-  { value: 'maybe', label: 'Maybe', sub: 'Not sure' },
-  { value: 'confident', label: 'Confident', sub: 'Pretty sure' },
-  { value: 'certain', label: 'Certain', sub: 'Absolutely' },
-]
-
 export default function QuestionCard(props: QuestionCardProps) {
   const { question, answered, feedback, afterAnswer } = props
 
@@ -122,9 +112,6 @@ export default function QuestionCard(props: QuestionCardProps) {
             <span className="mastery-ring-text">mastered</span>
           </div>
           <span className="question-position">{props.questionPosition}</span>
-          {props.confidenceTrend && (
-            <span className="confidence-trend">{props.confidenceTrend}</span>
-          )}
         </div>
       </div>
 
@@ -197,25 +184,6 @@ export default function QuestionCard(props: QuestionCardProps) {
           )}
 
           <div className="char-count">{textInputLen} chars</div>
-
-          {/* ── confidence ── */}
-          <div style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4 }}>
-              How confident are you?
-            </div>
-            <div className="confidence-grid">
-              {CONFIDENCE_LEVELS.map(cl => (
-                <button
-                  key={cl.value}
-                  className={`confidence-btn${props.confidence === cl.value ? ' active' : ''}`}
-                  onClick={() => props.onConfidenceChange(cl.value)}
-                >
-                  <div className="confidence-btn-label">{cl.label}</div>
-                  <div className="confidence-btn-sub">{cl.sub}</div>
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* ── help section ── */}
           <div className="help-row">

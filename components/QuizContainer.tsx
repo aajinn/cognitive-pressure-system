@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { ALL_Q } from '@/lib/questions'
-import type { Question, SMEntry, WrongItem, FeedbackState, McqHighlight, TfHighlight, RecallSeg, QuizScreen, Confidence, Difficulty } from '@/lib/types'
+import type { Question, SMEntry, WrongItem, FeedbackState, McqHighlight, TfHighlight, RecallSeg, QuizScreen, Difficulty } from '@/lib/types'
 import { createSM, recordResult, getDueQueue, isSessionComplete, computeDueCount, computeMasteredCount } from '@/lib/sm2'
 import { shuffle, checkRecall, checkExplain, checkGeneration, formatQHtml, getDotColor, correctMsg, wrongMsg, getFullAnswer } from '@/lib/utils'
 import { HIERARCHY, RELATIONS } from '@/lib/relations'
@@ -80,7 +80,6 @@ export default function QuizContainer() {
   const [analogyHighlight, setAnalogyHighlight] = useState<boolean | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
 
-  const [confidence, setConfidence] = useState<Confidence | null>(null)
   const [xp, setXp] = useState(0)
   const [showHintReveal, setShowHintReveal] = useState(false)
   const [showRelatedConcept, setShowRelatedConcept] = useState(false)
@@ -145,15 +144,6 @@ export default function QuizContainer() {
     if (currentQ.mark === '5-mark') return 'medium'
     return 'hard'
   }, [currentQ])
-
-  const confidenceTrend = useMemo(() => {
-    if (!currentQ) return ''
-    const s = smSnapshot[currentQ.id]
-    if (!s?.seen) return '✦ New'
-    if (s.streak >= 3) return '↑ Improving'
-    if (s.streak >= 1) return '↗ Building'
-    return '→ Reviewing'
-  }, [currentQ, smSnapshot])
 
   const topicPath = useMemo(() => {
     if (!currentQ) return ''
@@ -290,7 +280,6 @@ export default function QuizContainer() {
     setGenValue('')
     setGenChecked(false)
     setGenFeedback(null)
-    setConfidence(null)
     setShowHintReveal(false)
     setShowRelatedConcept(false)
     setShowExample(false)
@@ -321,7 +310,6 @@ export default function QuizContainer() {
     setGenValue('')
     setGenChecked(false)
     setGenFeedback(null)
-    setConfidence(null)
     setShowHintReveal(false)
     setShowRelatedConcept(false)
     setShowExample(false)
@@ -343,10 +331,6 @@ export default function QuizContainer() {
   const handleDismissWelcome = useCallback(() => {
     try { localStorage.setItem(WELCOME_KEY, '1') } catch {}
     setShowWelcome(false)
-  }, [])
-
-  const handleConfidenceChange = useCallback((c: Confidence) => {
-    setConfidence(c)
   }, [])
 
   const handleHint = useCallback(() => {
@@ -683,9 +667,6 @@ export default function QuizContainer() {
           masteryPct={progressPct}
           questionPosition={questionPositionStr}
           difficulty={difficulty}
-          confidenceTrend={confidenceTrend}
-          confidence={confidence}
-          onConfidenceChange={handleConfidenceChange}
           xp={xp}
           knowledgeGain={afterAnswerData?.xpGained ?? 0}
           showHintReveal={showHintReveal}

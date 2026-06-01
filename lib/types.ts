@@ -67,8 +67,6 @@ export interface HierarchyEdge {
   to: number
 }
 
-export type Confidence = 'guessing' | 'maybe' | 'confident' | 'certain'
-
 export type Difficulty = 'easy' | 'medium' | 'hard'
 
 export interface TopicMastery {
