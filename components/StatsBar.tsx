@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
+import type { AlgorithmType } from '@/lib/types'
 
 interface StatsBarProps {
   done: number
@@ -8,9 +9,11 @@ interface StatsBarProps {
   wrong: number
   due: number
   streak: number
+  algorithm: AlgorithmType
+  onAlgorithmChange: (a: AlgorithmType) => void
 }
 
-export default function StatsBar({ done, correct, wrong, due, streak }: StatsBarProps) {
+export default function StatsBar({ done, correct, wrong, due, streak, algorithm, onAlgorithmChange }: StatsBarProps) {
   const [open, setOpen] = useState(false)
   const [hidden, setHidden] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -30,6 +33,11 @@ export default function StatsBar({ done, correct, wrong, due, streak }: StatsBar
   const handleBlur = useCallback((e: React.FocusEvent) => {
     if (!ref.current?.contains(e.relatedTarget as Node)) setOpen(false)
   }, [])
+
+  const toggleAlgorithm = useCallback(() => {
+    onAlgorithmChange(algorithm === 'sm2' ? 'fsrs' : 'sm2')
+    setOpen(false)
+  }, [algorithm, onAlgorithmChange])
 
   if (hidden) {
     return (
@@ -63,6 +71,14 @@ export default function StatsBar({ done, correct, wrong, due, streak }: StatsBar
         {open && (
           <div className="stats-dropdown">
             <button className="stats-dropdown-item" onClick={hide}>Hide stats</button>
+            <div className="stats-dropdown-sep" />
+            <div className="stats-dropdown-label">Algorithm</div>
+            <button className={`stats-dropdown-item${algorithm === 'sm2' ? ' active' : ''}`} onClick={algorithm === 'sm2' ? undefined : toggleAlgorithm}>
+              SM-2
+            </button>
+            <button className={`stats-dropdown-item${algorithm === 'fsrs' ? ' active' : ''}`} onClick={algorithm === 'fsrs' ? undefined : toggleAlgorithm}>
+              FSRS
+            </button>
           </div>
         )}
       </div>

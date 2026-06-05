@@ -1,6 +1,6 @@
 'use client'
 
-import type { Question, McqHighlight, TfHighlight, FeedbackState, Difficulty } from '@/lib/types'
+import type { Question, McqHighlight, TfHighlight, FeedbackState, Difficulty, AlgorithmType } from '@/lib/types'
 import { TYPE_LABEL } from '@/lib/constants'
 import { formatQHtml } from '@/lib/utils'
 
@@ -67,6 +67,9 @@ interface QuestionCardProps {
     relatedConcepts: string[]
     nextRecommended: string
   } | null
+  retrievability: number | null
+  algorithm: AlgorithmType
+  targetDifficulty: Difficulty
 }
 
 function currentInput(q: Question, fillValues: string[], matchValues: string[], recallValue: string, explainValue: string, abstractValue: string, analogyValue: string): string {
@@ -103,15 +106,23 @@ export default function QuestionCard(props: QuestionCardProps) {
           {props.topicPath} <span>{question.topic}</span>
         </div>
         <div className="badge-glass">{TYPE_LABEL[question.type]}</div>
-        <span className={`badge-difficulty ${props.difficulty}`}>
+          <span className={`badge-difficulty ${props.difficulty}`}>
           {props.difficulty}
         </span>
+        {props.targetDifficulty !== props.difficulty && (
+          <span className="badge-adaptive">→ {props.targetDifficulty}</span>
+        )}
         <div className="header-right">
           <div className="mastery-ring">
             <span className="mastery-ring-value">{props.masteryPct}%</span>
             <span className="mastery-ring-text">mastered</span>
           </div>
           <span className="question-position">{props.questionPosition}</span>
+          {props.algorithm === 'fsrs' && props.retrievability !== null && (
+            <span className={`retrievability-ind ${props.retrievability > 0.7 ? 'high' : props.retrievability > 0.3 ? 'mid' : 'low'}`}>
+              R {Math.round(props.retrievability * 100)}%
+            </span>
+          )}
         </div>
       </div>
 
@@ -162,6 +173,39 @@ export default function QuestionCard(props: QuestionCardProps) {
               disabled={answered}
               rows={3}
             />
+          )}
+          {question.type === 'mcq' && question.options && (
+            <div className="mcq-premium">
+              {question.options.map((opt, i) => (
+                <button
+                  key={i}
+                  className={`opt${props.mcqHighlight ? (i === props.mcqHighlight.correct ? ' correct' : i === props.mcqHighlight.chosen ? ' wrong' : '') : ''}`}
+                  onClick={() => props.onMCQ(i)}
+                  disabled={answered}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+          {question.type === 'tf' && (
+            <div className="tf-row">
+              {[true, false].map(val => {
+                const hl = props.tfHighlight
+                const isCorrect = hl && hl.correct === val
+                const isWrong = hl && hl.selected === val && hl.selected !== hl.correct
+                return (
+                  <button
+                    key={String(val)}
+                    className={`tf-btn${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}`}
+                    onClick={() => props.onTF(val)}
+                    disabled={answered}
+                  >
+                    {val ? 'True' : 'False'}
+                  </button>
+                )
+              })}
+            </div>
           )}
           {question.type === 'match' && (
             <MatchInput pairs={question.pairs!} values={props.matchValues} highlight={props.matchHighlight} disabled={answered} onChange={props.onMatchChange} />
@@ -247,13 +291,17 @@ export default function QuestionCard(props: QuestionCardProps) {
           {/* ── action bar ── */}
           <div className="action-bar">
             <button className="btn-secondary">Skip</button>
-            <button
-              className="btn-primary"
-              onClick={handleCheck}
-              disabled={hasTextInput && textInputLen === 0}
-            >
-              Check Answer
-            </button>
+            {(question.type === 'mcq' || question.type === 'tf') ? (
+              <span className="action-hint">Tap an option above</span>
+            ) : (
+              <button
+                className="btn-primary"
+                onClick={handleCheck}
+                disabled={hasTextInput && textInputLen === 0}
+              >
+                Check Answer
+              </button>
+            )}
           </div>
         </>
       )}
