@@ -1,16 +1,17 @@
-import type { Question, SMEntry } from './types'
+import type { Question, CardState } from './types'
 import { shuffle } from './utils'
+import { INITIAL_CARD_STATE } from './constants'
 
-export function createSM(questions: Question[]): Record<number, SMEntry> {
-  const sm: Record<number, SMEntry> = {}
+export function createSM(questions: Question[]): Record<number, CardState> {
+  const sm: Record<number, CardState> = {}
   questions.forEach(q => {
-    sm[q.id] = { interval: 0, nextAt: 0, ease: 2.5, streak: 0, correct: 0, wrong: 0, seen: false }
+    sm[q.id] = { ...INITIAL_CARD_STATE }
   })
   return sm
 }
 
 export function recordResult(
-  sm: Record<number, SMEntry>,
+  sm: Record<number, CardState>,
   step: number,
   qid: number,
   correct: boolean,
@@ -36,7 +37,7 @@ export function recordResult(
 
 export function getDueQueue(
   questions: Question[],
-  sm: Record<number, SMEntry>,
+  sm: Record<number, CardState>,
   step: number,
 ): number[] {
   const due = shuffle(
@@ -50,7 +51,7 @@ export function getDueQueue(
 
 export function isSessionComplete(
   questions: Question[],
-  sm: Record<number, SMEntry>,
+  sm: Record<number, CardState>,
   step: number,
 ): boolean {
   const allSeen = questions.every(q => sm[q.id]?.seen)
@@ -60,7 +61,7 @@ export function isSessionComplete(
 
 export function computeDueCount(
   questions: Question[],
-  sm: Record<number, SMEntry>,
+  sm: Record<number, CardState>,
   step: number,
 ): number {
   return questions.filter(
@@ -70,7 +71,7 @@ export function computeDueCount(
 
 export function computeMasteredCount(
   questions: Question[],
-  sm: Record<number, SMEntry>,
+  sm: Record<number, CardState>,
 ): number {
   return questions.filter(q => sm[q.id]?.streak >= 2).length
 }

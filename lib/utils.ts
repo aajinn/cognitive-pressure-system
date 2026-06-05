@@ -46,6 +46,9 @@ export function checkRecall(input: string, answers: string[]): boolean {
   if (!val) return false
   return answers.some(a => {
     const exp = a.toLowerCase()
+    if (exp.length > 40) {
+      return val === exp || val.includes(exp)
+    }
     return val === exp || exp.includes(val) || val.includes(exp)
   })
 }
