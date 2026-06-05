@@ -1,7 +1,8 @@
 import type { Question } from './types'
+import { splitExplanation, pickClozeTerm } from './splitter'
 
 export const ALL_Q: Question[] = [
-  { id: 0, topic: "CIS", mark: "2-mark", type: "fill", q: "A Computer Information System collects, processes, stores, and _____ information for decision making.", blanks: ["distributes"], hint: "Think of the last step — getting info out to users." },
+  { id: 0, topic: "CIS", mark: "2-mark", type: "fill", q: "A Computer Information System collects, processes, stores, and _____ information for decision making.", blanks: ["distributes"], fillParts: ["collects", "processes", "stores", "distributes"], hint: "Think of the last step — getting info out to users." },
   { id: 1, topic: "Software Engineering", mark: "2-mark", type: "fill", q: "Software Engineering applies _____ principles to develop reliable and efficient software economically.", blanks: ["engineering"], hint: "The name itself is the clue." },
 
   { id: 2, topic: "DFD", mark: "2-mark", type: "mcq", q: "A Data Store in DFD is represented using:", options: ["A circle", "Two parallel lines", "A rectangle", "An arrow"], answer: 1 },
@@ -20,7 +21,7 @@ export const ALL_Q: Question[] = [
 
   { id: 9, topic: "Feasibility Study", mark: "2-mark", type: "mcq", q: "Which of these is NOT a type of Feasibility Study?", options: ["Technical", "Operational", "Algorithmic", "Schedule"], answer: 2 },
 
-  { id: 10, topic: "SRS", mark: "2-mark", type: "fill", q: "SRS stands for Software _____ Specification.", blanks: ["Requirement"], hint: "What does an SRS document?" },
+  { id: 10, topic: "SRS", mark: "2-mark", type: "fill", q: "SRS stands for Software _____ Specification.", blanks: ["Requirement"], fillParts: ["SRS", "Software", "Requirement", "Specification"], hint: "What does an SRS document?" },
 
   { id: 11, topic: "Brainstorming", mark: "2-mark", type: "tf", q: "Brainstorming is a one-on-one interview technique used for requirement gathering.", answer: false, exp: "Brainstorming is a GROUP discussion technique, not one-on-one." },
 
@@ -114,3 +115,80 @@ export const ALL_Q: Question[] = [
 
   { id: 56, topic: "Analogy: Cohesion", mark: "5-mark", type: "analogy", q: "High cohesion means elements inside a module serve a single, well-defined purpose (good). Low cohesion means unrelated elements are grouped together (bad). Find a real-world non-software system where this principle naturally appears — a well-organized vs poorly-organized system. What makes high cohesion valuable there?", answer: "Like a hospital emergency room: High cohesion = triage (all triage together), treatment rooms (all treatment together), radiology (all X-rays together) — each area has a clear purpose, staff stay in their expertise zone. Low cohesion = mixed-use rooms where triage, treatment, and X-rays happen in the same space — chaos, cross-contamination, staff wasting time switching roles. High cohesion makes each unit efficient and focused." },
 ]
+
+const VARIANT_OFFSET = 10000
+const EXP_OFFSET = 20000
+
+export function getExpandedQuestions(): Question[] {
+  const expanded: Question[] = []
+
+  for (const q of ALL_Q) {
+    expanded.push({ ...q })
+
+    if (q.fillParts && q.fillParts.length > 1) {
+      const fullQ = q.q.replace('_____', q.blanks![0])
+      q.fillParts.forEach((part, i) => {
+        expanded.push({
+          ...q,
+          id: q.id * 1000 + VARIANT_OFFSET + i,
+          q: fullQ.replace(part, '_____'),
+          blanks: [part],
+        })
+      })
+    }
+
+    if (q.exp && q.exp.length > 50) {
+      const facts = splitExplanation(q.exp)
+      const allKeyTerms: string[] = []
+
+      facts.forEach((fact, fi) => {
+        fact.keyTerms.forEach(kt => {
+          if (!allKeyTerms.includes(kt)) allKeyTerms.push(kt)
+        })
+
+        const baseId = q.id * 1000 + EXP_OFFSET + fi * 10
+        const clozeTerm = pickClozeTerm(fact)
+
+        if (clozeTerm) {
+          const clozeQ = fact.text.replace(clozeTerm, '_____')
+          if (clozeQ !== fact.text) {
+            expanded.push({
+              id: baseId,
+              topic: q.topic,
+              mark: q.mark,
+              type: 'fill',
+              q: clozeQ,
+              blanks: [clozeTerm],
+              hint: `Think about what "${clozeTerm}" means in this context.`,
+              exp: fact.text,
+            })
+          }
+        }
+
+        expanded.push({
+          id: baseId + 1,
+          topic: q.topic,
+          mark: q.mark,
+          type: 'recall',
+          q: `Complete — ${q.topic}: ${fact.text.length > 80 ? fact.text.substring(0, 77) + '...' : fact.text}`,
+          answers: [fact.text],
+          exp: fact.text,
+        })
+      })
+
+      if (facts.length >= 2 && allKeyTerms.length > 0) {
+        expanded.push({
+          id: q.id * 1000 + EXP_OFFSET + 9999,
+          topic: q.topic,
+          mark: q.mark,
+          type: 'explain',
+          q: `Explain the full rationale for: ${q.topic}`,
+          keyTerms: allKeyTerms,
+          answer: q.exp,
+        })
+      }
+    }
+  }
+
+  return expanded
+}
