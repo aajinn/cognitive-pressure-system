@@ -11,16 +11,19 @@ export interface Question {
   answers?: string[]
   keyTerms?: string[]
   blanks?: string[]
+  fillParts?: string[]
   examples?: string[]
   hint?: string
   exp?: string
   pairs?: [string, string][]
 }
 
-export interface SMEntry {
+export interface CardState {
   interval: number
   nextAt: number
   ease: number
+  difficulty: number
+  stability: number
   streak: number
   correct: number
   wrong: number
@@ -80,3 +83,5 @@ export interface KnowledgeGain {
   xp: number
   message: string
 }
+
+export type AlgorithmType = 'sm2' | 'fsrs'

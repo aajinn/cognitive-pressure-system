@@ -51,10 +51,12 @@ export const SHORT_TYPE_LABEL: Record<QType, string> = {
   analogy: 'Alg.',
 }
 
-export const INITIAL_SM_ENTRY = {
+export const INITIAL_CARD_STATE = {
   interval: 0,
   nextAt: 0,
   ease: 2.5,
+  difficulty: 5.0,
+  stability: 1.0,
   streak: 0,
   correct: 0,
   wrong: 0,
