@@ -20,7 +20,7 @@ Not all difficulty is bad. The system intentionally introduces productive cognit
 
 Questions are shuffled across topics and types, forcing the brain to discriminate between related concepts. Interleaved practice (Rohrer, 2012) produces superior transfer and retention compared to blocked practice, because it strengthens **discriminative encoding** — the ability to tell concepts apart.
 
-### 🎯 Metacognitive Calibration
+### Metacognitive Calibration
 
 A 4-level confidence scale (Guessing → Maybe → Confident → Certain) accompanies every answer. This builds **metacognitive monitoring** — the learner's ability to judge their own knowledge state. Research shows that calibrated confidence predicts long-term retention and reduces the illusion of fluency.
 
