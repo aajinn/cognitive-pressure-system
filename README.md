@@ -4,19 +4,19 @@ A science-backed spaced-repetition quiz engine for engineering exam mastery. Bui
 
 ## The Science Behind the System
 
-### 🧠 Spacing Effect (Ebbinghaus Forgetting Curve)
+### Spacing Effect (Ebbinghaus Forgetting Curve)
 
 The SM-2 algorithm schedules review intervals based on the exponential-forgetting model first documented by Hermann Ebbinghaus (1885). Each correct answer expands the interval; each mistake collapses it back. The result is a review rhythm that intercepts the forgetting curve at its steepest drop — the moment when reactivation produces the strongest long-term retention.
 
-### 🔁 Retrieval Practice (Testing Effect)
+### Retrieval Practice (Testing Effect)
 
 Before re-answering any seen question, the system requires a **generation phase** — free recall from memory without cues. This leverages the **testing effect** (Roediger & Karpicke, 2006): the act of retrieving knowledge strengthens neural pathways more than passive re-study, even when retrieval fails.
 
-### ⚖️ Desirable Difficulties
+### Desirable Difficulties
 
 Not all difficulty is bad. The system intentionally introduces productive cognitive friction — free recall instead of recognition, interleaved topics, and multi-step explanation tasks — following Bjork & Bjork's (2011) framework of **desirable difficulties** that slow acquisition but accelerate long-term consolidation.
 
-### 🔀 Interleaving & Varied Practice
+### Interleaving & Varied Practice
 
 Questions are shuffled across topics and types, forcing the brain to discriminate between related concepts. Interleaved practice (Rohrer, 2012) produces superior transfer and retention compared to blocked practice, because it strengthens **discriminative encoding** — the ability to tell concepts apart.
 
@@ -24,19 +24,19 @@ Questions are shuffled across topics and types, forcing the brain to discriminat
 
 A 4-level confidence scale (Guessing → Maybe → Confident → Certain) accompanies every answer. This builds **metacognitive monitoring** — the learner's ability to judge their own knowledge state. Research shows that calibrated confidence predicts long-term retention and reduces the illusion of fluency.
 
-### 📊 Cognitive Load Management
+### Cognitive Load Management
 
 The system segments content by mark weight (2-mark / 5-mark / 15-mark) to manage **intrinsic cognitive load** (Sweller, 1988). Easier items build schema fluency before harder items demand deeper elaboration. The progress and recall bars provide **extraneous load** reduction — the learner never has to mentally track their state.
 
-### 📈 Yerkes-Dodson Arousal Curve
+### Yerkes-Dodson Arousal Curve
 
 Streak tracking and XP gamification are calibrated to maintain **moderate arousal** — the optimal zone on the Yerkes-Dodson curve for complex cognitive performance. Too few correct answers in a row depresses engagement; too many without challenge risks over-arousal.
 
-### 🧩 Dual Coding
+### Dual Coding
 
 Questions pair textual concepts with structured formats (matching columns, fill-in-the-blank with context, multiple-choice with semantic hints), engaging both verbal and visual-spatial processing channels (Paivio, 1986) for richer memory encoding.
 
-### 🧬 Neuroplasticity & Growth Mindset
+### Neuroplasticity & Growth Mindset
 
 End-of-session messages are framed around effort and strategy, not fixed ability. This aligns with Dweck's (2006) **growth mindset** research: attributing outcomes to strategy use rather than talent increases persistence and learning.
 
