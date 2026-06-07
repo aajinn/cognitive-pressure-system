@@ -1,10 +1,15 @@
 export type QType = 'mcq' | 'tf' | 'fill' | 'match' | 'recall' | 'explain' | 'reconstruct' | 'abstract' | 'transfer' | 'analogy'
 
+export type Phase = 'core' | 'intermediate' | 'advanced' | 'transfer'
+
+export const PHASE_ORDER: Phase[] = ['core', 'intermediate', 'advanced', 'transfer']
+
 export interface Question {
   id: number
   topic: string
   mark: string
   type: QType
+  phase?: Phase
   q: string
   options?: string[]
   answer?: number | boolean | string

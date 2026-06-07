@@ -3,12 +3,13 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { getExpandedQuestions } from '@/lib/questions'
 const ALL_Q = getExpandedQuestions()
-import type { Question, CardState, WrongItem, FeedbackState, McqHighlight, TfHighlight, RecallSeg, QuizScreen, Difficulty, AlgorithmType } from '@/lib/types'
+import type { Question, CardState, WrongItem, FeedbackState, McqHighlight, TfHighlight, RecallSeg, QuizScreen, Difficulty, AlgorithmType, Phase } from '@/lib/types'
+import { PHASE_ORDER } from '@/lib/types'
 import { createSM, recordResult, getDueQueue, isSessionComplete, computeDueCount, computeMasteredCount } from '@/lib/sm2'
 import { createFSRS, recordResultFSRS, getRetrievability, getDueQueueFSRS } from '@/lib/fsrs'
 import { shuffle, checkRecall, checkExplain, checkGeneration, formatQHtml, getDotColor, correctMsg, wrongMsg, getFullAnswer } from '@/lib/utils'
 import { HIERARCHY, RELATIONS } from '@/lib/relations'
-import { TYPE_LABEL, INITIAL_CARD_STATE } from '@/lib/constants'
+import { TYPE_LABEL, INITIAL_CARD_STATE, PHASE_LABEL, PHASE_COLOR, DEEP_TYPES, DEEP_BONUS_XP } from '@/lib/constants'
 import Header from './Header'
 import ProgressBar from './ProgressBar'
 import StatsBar from './StatsBar'
@@ -53,10 +54,22 @@ function loadState(algorithm: AlgorithmType): { sm: Record<number, CardState>; s
   return { sm: create(ALL_Q), step: 0 }
 }
 
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+let pendingSm: Record<number, CardState> | null = null
+let pendingStep = 0
+
 function persistState(sm: Record<number, CardState>, step: number) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ sm, step }))
-  } catch {}
+  pendingSm = sm
+  pendingStep = step
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => {
+    try {
+      if (pendingSm) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ sm: pendingSm, step: pendingStep }))
+        pendingSm = null
+      }
+    } catch {}
+  }, 400)
 }
 
 export default function QuizContainer() {
@@ -69,6 +82,16 @@ export default function QuizContainer() {
   const [smSnapshot, setSmSnapshot] = useState<Record<number, CardState>>(() => createSM(ALL_Q))
   const [step, setStep] = useState(0)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [currentPhaseIdx, setCurrentPhaseIdx] = useState(0)
+  const [phaseJustUnlocked, setPhaseJustUnlocked] = useState(false)
+
+  const activeQuestionsRef = useRef(ALL_Q)
+
+  useEffect(() => {
+    activeQuestionsRef.current = ALL_Q.filter(
+      q => PHASE_ORDER.indexOf(q.phase ?? 'core') <= currentPhaseIdx,
+    )
+  }, [currentPhaseIdx])
 
   useEffect(() => {
     const alg = loadAlgorithm()
@@ -112,6 +135,20 @@ export default function QuizContainer() {
   const [currentQ, setCurrentQ] = useState<Question | null>(null)
   const [answered, setAnswered] = useState(false)
   const [sessionDone, setSessionDone] = useState(0)
+
+  // Advance phase when all base questions in current phase are seen
+  useEffect(() => {
+    if (currentPhaseIdx >= PHASE_ORDER.length - 1) return
+    const currentPhase = PHASE_ORDER[currentPhaseIdx]
+    const unseen = ALL_Q.filter(
+      q => (q.phase ?? 'core') === currentPhase && q.id < 10000 && !smRef.current[q.id]?.seen,
+    )
+    if (unseen.length === 0) {
+      setCurrentPhaseIdx(prev => Math.min(prev + 1, PHASE_ORDER.length - 1))
+      setPhaseJustUnlocked(true)
+    }
+  }, [sessionDone, currentPhaseIdx])
+
   const [sessionCorrect, setSessionCorrect] = useState(0)
   const [sessionWrong, setSessionWrong] = useState(0)
   const [wrongItems, setWrongItems] = useState<WrongItem[]>([])
@@ -132,6 +169,7 @@ export default function QuizContainer() {
   const [analogyValue, setAnalogyValue] = useState('')
   const [analogyHighlight, setAnalogyHighlight] = useState<boolean | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
+  const [teachbackValue, setTeachbackValue] = useState('')
 
   const [xp, setXp] = useState(0)
   const [showHintReveal, setShowHintReveal] = useState(false)
@@ -151,19 +189,24 @@ export default function QuizContainer() {
   const [genChecked, setGenChecked] = useState(false)
   const [genFeedback, setGenFeedback] = useState<FeedbackState | null>(null)
 
+  const unlockedQuestions = useMemo(
+    () => ALL_Q.filter(q => PHASE_ORDER.indexOf(q.phase ?? 'core') <= currentPhaseIdx),
+    [currentPhaseIdx],
+  )
+
   const dueCount = useMemo(
-    () => computeDueCount(ALL_Q, smSnapshot, step),
-    [smSnapshot, step],
+    () => computeDueCount(unlockedQuestions, smSnapshot, step),
+    [smSnapshot, step, unlockedQuestions],
   )
   const masteredCount = useMemo(
     () => algorithm === 'fsrs'
-      ? ALL_Q.filter(q => { const s = smSnapshot[q.id]; return s.seen && s.stability >= 4 }).length
-      : computeMasteredCount(ALL_Q, smSnapshot),
-    [smSnapshot, algorithm],
+      ? unlockedQuestions.filter(q => { const s = smSnapshot[q.id]; return s.seen && s.stability >= 4 }).length
+      : computeMasteredCount(unlockedQuestions, smSnapshot),
+    [smSnapshot, algorithm, unlockedQuestions],
   )
   const progressPct = useMemo(
-    () => Math.round((masteredCount / ALL_Q.length) * 100),
-    [masteredCount],
+    () => unlockedQuestions.length > 0 ? Math.round((masteredCount / unlockedQuestions.length) * 100) : 0,
+    [masteredCount, unlockedQuestions],
   )
 
   const isMastered = useCallback((s: CardState) => {
@@ -172,7 +215,7 @@ export default function QuizContainer() {
   }, [])
 
   const recallSegs: RecallSeg[] = useMemo(() => {
-    return ALL_Q.map(q => {
+    return unlockedQuestions.map(q => {
       const s = smSnapshot[q.id]
       let cls = 'recall-seg'
       if (!s.seen) cls += ' new'
@@ -180,7 +223,7 @@ export default function QuizContainer() {
       else cls += ' due'
       return { cls, title: q.topic }
     })
-  }, [smSnapshot, isMastered])
+  }, [smSnapshot, isMastered, unlockedQuestions])
 
   const isRepeat = currentQ
     ? smSnapshot[currentQ.id]?.seen && smSnapshot[currentQ.id]?.streak === 0
@@ -189,8 +232,8 @@ export default function QuizContainer() {
   const currentSeen = currentQ ? smSnapshot[currentQ.id]?.seen : false
   const currentStreak = currentQ ? smSnapshot[currentQ.id]?.streak : 0
   const maxStreak = useMemo(
-    () => Math.max(...ALL_Q.map(q => smSnapshot[q.id]?.streak ?? 0)),
-    [smSnapshot],
+    () => Math.max(...unlockedQuestions.map(q => smSnapshot[q.id]?.streak ?? 0), 0),
+    [smSnapshot, unlockedQuestions],
   )
 
   const shuffledMatchRights = useMemo(() => {
@@ -256,29 +299,30 @@ export default function QuizContainer() {
 
   const relatedTopics = useMemo(() => {
     if (!currentQ) return []
+    const qs = activeQuestionsRef.current
     const result: { id: number; topic: string; type: 'prereq' | 'related' }[] = []
     const added = new Set<number>()
     HIERARCHY.forEach(e => {
       if (e.to === currentQ.id && !added.has(e.from)) {
         added.add(e.from)
-        const q = ALL_Q.find(q => q.id === e.from)
+        const q = qs.find(q => q.id === e.from)
         if (q) result.push({ id: q.id, topic: q.topic, type: 'prereq' })
       }
       if (e.from === currentQ.id && !added.has(e.to)) {
         added.add(e.to)
-        const q = ALL_Q.find(q => q.id === e.to)
+        const q = qs.find(q => q.id === e.to)
         if (q) result.push({ id: q.id, topic: q.topic, type: 'related' })
       }
     })
     RELATIONS.forEach(r => {
       if (r.from === currentQ.id && !added.has(r.to)) {
         added.add(r.to)
-        const q = ALL_Q.find(q => q.id === r.to)
+        const q = qs.find(q => q.id === r.to)
         if (q) result.push({ id: q.id, topic: q.topic, type: 'related' })
       }
       if (r.to === currentQ.id && !added.has(r.from)) {
         added.add(r.from)
-        const q = ALL_Q.find(q => q.id === r.from)
+        const q = qs.find(q => q.id === r.from)
         if (q) result.push({ id: q.id, topic: q.topic, type: 'related' })
       }
     })
@@ -287,9 +331,10 @@ export default function QuizContainer() {
 
   const questionPositionStr = useMemo(() => {
     if (!currentQ) return ''
-    const total = ALL_Q.length
-    return `${currentQ.id + 1} / ${total}`
-  }, [currentQ])
+    const total = unlockedQuestions.length
+    const idx = unlockedQuestions.findIndex(q => q.id === currentQ.id)
+    return `${idx + 1} / ${total}`
+  }, [currentQ, unlockedQuestions])
 
   function computeAfterAnswer(correct: boolean, q: Question): {
     correct: boolean
@@ -300,21 +345,23 @@ export default function QuizContainer() {
     nextRecommended: string
   } {
     const xpBase = q.mark === '2-mark' ? 8 : q.mark === '5-mark' ? 12 : 20
-    const xpGained = correct ? xpBase : 2
+    const isDeep = DEEP_TYPES.includes(q.type as typeof DEEP_TYPES[number])
+    const xpGained = correct ? Math.round(xpBase * (isDeep ? DEEP_BONUS_XP : 1)) : 2
     const explanation = q.exp || `The correct answer: ${getFullAnswer(q)}`
 
+    const qs = activeQuestionsRef.current
     const relatedConcepts = RELATIONS
       .filter(r => r.from === q.id || r.to === q.id)
       .map(r => {
         const otherId = r.from === q.id ? r.to : r.from
-        const other = ALL_Q.find(qq => qq.id === otherId)
+        const other = qs.find(qq => qq.id === otherId)
         return other ? other.topic : ''
       })
       .filter(Boolean)
       .slice(0, 4)
 
     const nextId = HIERARCHY.find(e => e.from === q.id)?.to
-    const nextRec = nextId !== undefined ? (ALL_Q.find(qq => qq.id === nextId)?.topic || '') : ''
+    const nextRec = nextId !== undefined ? (qs.find(qq => qq.id === nextId)?.topic || '') : ''
     const nextRecommended = nextRec || (relatedConcepts[0] ? `Explore: ${relatedConcepts[0]}` : 'Continue the session')
 
     return {
@@ -328,14 +375,31 @@ export default function QuizContainer() {
   }
 
   const buildQueue = useCallback(() => {
+    const qs = activeQuestionsRef.current
     const base = algorithmRef.current === 'fsrs'
-      ? getDueQueueFSRS(ALL_Q, smRef.current, stepRef.current)
-      : getDueQueue(ALL_Q, smRef.current, stepRef.current)
+      ? getDueQueueFSRS(qs, smRef.current, stepRef.current)
+      : getDueQueue(qs, smRef.current, stepRef.current)
+
+    // In Transfer phase, prioritize deep-type questions (abstract/transfer/analogy)
+    if (currentPhaseIdx === PHASE_ORDER.indexOf('transfer')) {
+      queueRef.current = base.sort((a, b) => {
+        const qA = qs.find(q => q.id === a)
+        const qB = qs.find(q => q.id === b)
+        if (!qA || !qB) return 0
+        const aDeep = DEEP_TYPES.includes(qA.type)
+        const bDeep = DEEP_TYPES.includes(qB.type)
+        if (aDeep && !bDeep) return -1
+        if (!aDeep && bDeep) return 1
+        return 0
+      })
+      return
+    }
+
     const target = getTargetDifficulty()
     if (target === 'medium') { queueRef.current = base; return }
     queueRef.current = base.sort((a, b) => {
-      const qA = ALL_Q.find(q => q.id === a)
-      const qB = ALL_Q.find(q => q.id === b)
+      const qA = qs.find(q => q.id === a)
+      const qB = qs.find(q => q.id === b)
       if (!qA || !qB) return 0
       const dA: Difficulty = qA.mark === '2-mark' ? 'easy' : qA.mark === '5-mark' ? 'medium' : 'hard'
       const dB: Difficulty = qB.mark === '2-mark' ? 'easy' : qB.mark === '5-mark' ? 'medium' : 'hard'
@@ -343,13 +407,14 @@ export default function QuizContainer() {
       const scoreB = dB === target ? 0 : dB === 'medium' ? 1 : 2
       return scoreA - scoreB
     })
-  }, [])
+  }, [currentPhaseIdx])
 
   const nextCard = useCallback(() => {
+    const qs = activeQuestionsRef.current
     buildQueue()
     if (queueRef.current.length === 0) { setScreen('end'); return }
-    if (isSessionComplete(ALL_Q, smRef.current, stepRef.current)) { setScreen('end'); return }
-    const q = ALL_Q.find(q => q.id === queueRef.current[0])
+    if (isSessionComplete(qs, smRef.current, stepRef.current)) { setScreen('end'); return }
+    const q = qs.find(q => q.id === queueRef.current[0])
     setCurrentQ(q ?? null)
     setAnswered(false)
     setMcqHighlight(null)
@@ -373,12 +438,13 @@ export default function QuizContainer() {
     setShowRelatedConcept(false)
     setShowExample(false)
     setAfterAnswerData(null)
+    setTeachbackValue('')
     if (q?.type === 'fill' || q?.type === 'reconstruct') setFillValues(q.blanks!.map(() => ''))
     if (q?.type === 'match') setMatchValues(q.pairs!.map(() => ''))
   }, [buildQueue])
 
   const jumpToQuestion = useCallback((id: number) => {
-    const q = ALL_Q.find(q => q.id === id)
+    const q = activeQuestionsRef.current.find(q => q.id === id)
     if (!q) return
     setCurrentQ(q)
     setAnswered(false)
@@ -410,7 +476,7 @@ export default function QuizContainer() {
   useEffect(() => {
     setSmSnapshot({...smRef.current})
     setStep(stepRef.current)
-  }, [sessionDone])
+  }, [sessionDone, currentPhaseIdx, algorithm])
 
   const handleDismissWelcome = useCallback(() => {
     try { localStorage.setItem(WELCOME_KEY, '1') } catch {}
@@ -438,6 +504,8 @@ export default function QuizContainer() {
     stepRef.current = 0
     perfHistoryRef.current = []
     try { localStorage.removeItem(STORAGE_KEY) } catch {}
+    setCurrentPhaseIdx(0)
+    setPhaseJustUnlocked(false)
     setAlgorithm(alg)
     setSessionDone(0)
     setSessionCorrect(0)
@@ -667,6 +735,8 @@ export default function QuizContainer() {
     perfHistoryRef.current = []
     try { localStorage.removeItem(STORAGE_KEY) } catch {}
     try { localStorage.removeItem(ALGORITHM_KEY) } catch {}
+    setCurrentPhaseIdx(0)
+    setPhaseJustUnlocked(false)
     setAlgorithm('sm2')
     setSessionDone(0)
     setSessionCorrect(0)
@@ -709,6 +779,8 @@ export default function QuizContainer() {
 
   const analogyChange = useCallback((v: string) => setAnalogyValue(v), [])
 
+  const teachbackChange = useCallback((v: string) => setTeachbackValue(v), [])
+
   return (
     <div className="wrap">
       <Header done={sessionDone} onOpenQA={() => { setModalOpen(true); setModalFilter('all') }} />
@@ -716,12 +788,27 @@ export default function QuizContainer() {
       <AllQAModal
         open={modalOpen}
         filter={modalFilter}
-        questions={ALL_Q}
+        questions={unlockedQuestions}
         onClose={() => setModalOpen(false)}
         onFilterChange={setModalFilter}
       />
 
       <ProgressBar pct={progressPct} />
+
+      {/* Phase progression indicator */}
+      <div className="phase-strip">
+        {PHASE_ORDER.map((phase, i) => (
+          <div key={phase} className={`phase-dot${i <= currentPhaseIdx ? ' unlocked' : ''}`}>
+            <span className="phase-dot-inner" style={{ background: i <= currentPhaseIdx ? PHASE_COLOR[phase] : 'var(--border)' }} />
+            <span className="phase-dot-label">{PHASE_LABEL[phase]}</span>
+          </div>
+        ))}
+        <div className="phase-active-label">
+          {PHASE_LABEL[PHASE_ORDER[currentPhaseIdx]]}
+          {phaseJustUnlocked && <span className="phase-unlock-badge">New!</span>}
+        </div>
+      </div>
+
       <StatsBar done={sessionDone} correct={sessionCorrect} wrong={sessionWrong} due={dueCount} streak={maxStreak} algorithm={algorithm} onAlgorithmChange={handleAlgorithmChange} />
       <RecallBar segs={recallSegs} />
 
@@ -800,6 +887,8 @@ export default function QuizContainer() {
           contextReasons={contextReasons}
           relatedTopics={relatedTopics}
           afterAnswer={afterAnswerData}
+          teachbackValue={teachbackValue}
+          onTeachbackChange={teachbackChange}
           retrievability={currentRetrievability}
           algorithm={algorithm}
           targetDifficulty={targetDifficulty}

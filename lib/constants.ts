@@ -1,4 +1,4 @@
-import type { QType } from './types'
+import type { Phase, QType } from './types'
 
 export const END_MSGS: [number, string][] = [
   [90, 'Excellent. Almost everything is mastered.'],
@@ -36,6 +36,24 @@ export const TYPE_LABEL: Record<QType, string> = {
   abstract: 'Abstract',
   transfer: 'Transfer',
   analogy: 'Analogy',
+}
+
+export const DEEP_TYPES: QType[] = ['abstract', 'transfer', 'analogy']
+
+export const DEEP_BONUS_XP = 1.5
+
+export const PHASE_LABEL: Record<Phase, string> = {
+  core: 'Core',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+  transfer: 'Transfer',
+}
+
+export const PHASE_COLOR: Record<Phase, string> = {
+  core: 'var(--accent)',
+  intermediate: 'var(--green)',
+  advanced: 'var(--amber)',
+  transfer: 'var(--red)',
 }
 
 export const SHORT_TYPE_LABEL: Record<QType, string> = {

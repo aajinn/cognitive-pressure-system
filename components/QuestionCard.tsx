@@ -70,6 +70,8 @@ interface QuestionCardProps {
   retrievability: number | null
   algorithm: AlgorithmType
   targetDifficulty: Difficulty
+  teachbackValue: string
+  onTeachbackChange: (v: string) => void
 }
 
 function currentInput(q: Question, fillValues: string[], matchValues: string[], recallValue: string, explainValue: string, abstractValue: string, analogyValue: string): string {
@@ -354,9 +356,31 @@ export default function QuestionCard(props: QuestionCardProps) {
             </div>
           )}
 
+          {/* teach-back */}
+          <div className="teachback-section">
+            <div className="teachback-title">Teach-back: Explain why this answer is correct</div>
+            <textarea
+              className="teachback-input"
+              value={props.teachbackValue}
+              onChange={e => props.onTeachbackChange(e.target.value)}
+              placeholder="Restate the reasoning in your own words — this locks in the memory..."
+              rows={2}
+            />
+            <div className="teachback-hint">
+              {props.teachbackValue.length < 15
+                ? `Write at least ${15 - props.teachbackValue.length} more characters to continue`
+                : '✓ Good — you\'ve thought it through'}
+            </div>
+          </div>
+
           {/* action */}
           <div className="action-bar">
-            <button className="btn-primary" onClick={props.onNext} style={{ flex: 1 }}>
+            <button
+              className="btn-primary"
+              onClick={props.onNext}
+              style={{ flex: 1 }}
+              disabled={props.teachbackValue.trim().length < 15}
+            >
               Next →
             </button>
           </div>

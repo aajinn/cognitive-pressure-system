@@ -26,8 +26,62 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .logo span{color:var(--accent)}
 .session-info{font-size:12px;color:var(--muted);font-family:var(--font-dm-mono),'DM Mono',monospace;text-align:right}
 
-.progress-track{height:4px;background:var(--border);border-radius:99px;margin-bottom:14px;overflow:hidden}
+.progress-track{height:4px;background:var(--border);border-radius:99px;margin-bottom:10px;overflow:hidden}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+/* ── phase progression strip ── */
+.phase-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: rgba(23, 23, 26, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+}
+.phase-dot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.phase-dot-inner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: background .3s ease;
+}
+.phase-dot-label {
+  font-size: 9px;
+  font-family: var(--font-dm-mono), DM Mono, monospace;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  display: none;
+}
+.phase-dot.unlocked .phase-dot-label {
+  display: inline;
+}
+.phase-active-label {
+  margin-left: auto;
+  font-size: 10px;
+  font-family: var(--font-dm-mono), DM Mono, monospace;
+  font-weight: 600;
+  color: var(--accent2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.phase-unlock-badge {
+  font-size: 8px;
+  font-family: var(--font-dm-mono), DM Mono, monospace;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  animation: cardIn .3s ease;
+}
 
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:12px;position:relative}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 4px;text-align:center}
@@ -700,6 +754,58 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   font-size: 13px;
   color: var(--text);
   font-weight: 600;
+}
+
+/* ── teach-back section ── */
+
+.teachback-section {
+  margin-top: 16px;
+  padding: 16px 18px;
+  background: rgba(124, 106, 247, 0.04);
+  border: 1px solid rgba(124, 106, 247, 0.1);
+  border-radius: 16px;
+  animation: cardIn .25s ease;
+}
+
+.teachback-title {
+  font-size: 10px;
+  font-family: var(--font-dm-mono), DM Mono, monospace;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+
+.teachback-input {
+  width: 100%;
+  background: rgba(31, 31, 36, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  font-family: var(--font-lexend), Lexend, sans-serif;
+  transition: border-color .2s;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.teachback-input:focus {
+  border-color: rgba(124, 106, 247, 0.3);
+}
+
+.teachback-input::placeholder {
+  color: var(--muted);
+  opacity: .5;
+}
+
+.teachback-hint {
+  font-size: 10px;
+  font-family: var(--font-dm-mono), DM Mono, monospace;
+  color: var(--muted);
+  margin-top: 6px;
+  text-align: right;
 }
 
 /* ── selected input styling in premium mode ── */
