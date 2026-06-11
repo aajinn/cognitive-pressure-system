@@ -89,4 +89,35 @@ export interface KnowledgeGain {
   message: string
 }
 
-export type AlgorithmType = 'sm2' | 'fsrs'
+export type AlgorithmType = 'sm2' | 'fsrs' | 'fema'
+
+// ── FEMA-1 ──────────────────────────────────────────────────────────────────
+// Ladder rung for a concept: 0=recognition, 1=cued, 2=generative, 3=transfer
+export type FemaRung = 0 | 1 | 2 | 3
+
+// Maps QType to which ladder rung it belongs to
+export type FemaRungs = Record<string, FemaRung>
+
+export interface FemaConceptState {
+  /** Current rung the learner is on (0–3) */
+  rung: FemaRung
+  /** Consecutive correct answers on the current rung */
+  runStreak: number
+  /** Phase-A encoding sequence still to show (question ids, in order) */
+  encodingQueue: number[]
+  /** Whether Phase-A encoding for this concept has been triggered */
+  encodingDone: boolean
+  /** Total correct answers across all rungs */
+  correct: number
+  /** Total wrong answers across all rungs */
+  wrong: number
+  /** Step at which this concept was last reviewed */
+  lastStep: number
+  /** Spaced-repetition interval in steps */
+  interval: number
+  /** Next step at which this concept is due */
+  nextAt: number
+}
+
+/** Full FEMA state: one entry per base-concept (using the topic string as key) */
+export type FemaState = Record<string, FemaConceptState>

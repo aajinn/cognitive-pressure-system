@@ -34,10 +34,10 @@ export default function StatsBar({ done, correct, wrong, due, streak, algorithm,
     if (!ref.current?.contains(e.relatedTarget as Node)) setOpen(false)
   }, [])
 
-  const toggleAlgorithm = useCallback(() => {
-    onAlgorithmChange(algorithm === 'sm2' ? 'fsrs' : 'sm2')
+  const toggleAlgorithm = useCallback((alg: AlgorithmType) => {
+    onAlgorithmChange(alg)
     setOpen(false)
-  }, [algorithm, onAlgorithmChange])
+  }, [onAlgorithmChange])
 
   if (hidden) {
     return (
@@ -73,11 +73,14 @@ export default function StatsBar({ done, correct, wrong, due, streak, algorithm,
             <button className="stats-dropdown-item" onClick={hide}>Hide stats</button>
             <div className="stats-dropdown-sep" />
             <div className="stats-dropdown-label">Algorithm</div>
-            <button className={`stats-dropdown-item${algorithm === 'sm2' ? ' active' : ''}`} onClick={algorithm === 'sm2' ? undefined : toggleAlgorithm}>
+            <button className={`stats-dropdown-item${algorithm === 'sm2' ? ' active' : ''}`} onClick={algorithm === 'sm2' ? undefined : () => toggleAlgorithm('sm2')}>
               SM-2
             </button>
-            <button className={`stats-dropdown-item${algorithm === 'fsrs' ? ' active' : ''}`} onClick={algorithm === 'fsrs' ? undefined : toggleAlgorithm}>
+            <button className={`stats-dropdown-item${algorithm === 'fsrs' ? ' active' : ''}`} onClick={algorithm === 'fsrs' ? undefined : () => toggleAlgorithm('fsrs')}>
               FSRS
+            </button>
+            <button className={`stats-dropdown-item${algorithm === 'fema' ? ' active' : ''}`} onClick={algorithm === 'fema' ? undefined : () => toggleAlgorithm('fema')}>
+              FEMA-1
             </button>
           </div>
         )}

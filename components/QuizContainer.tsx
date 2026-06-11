@@ -3,13 +3,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { getExpandedQuestions } from '@/lib/questions'
 const ALL_Q = getExpandedQuestions()
-import type { Question, CardState, WrongItem, FeedbackState, McqHighlight, TfHighlight, RecallSeg, QuizScreen, Difficulty, AlgorithmType, Phase } from '@/lib/types'
+import type { Question, CardState, FemaState, WrongItem, FeedbackState, McqHighlight, TfHighlight, RecallSeg, QuizScreen, Difficulty, AlgorithmType, Phase } from '@/lib/types'
 import { PHASE_ORDER } from '@/lib/types'
 import { createSM, recordResult, getDueQueue, isSessionComplete, computeDueCount, computeMasteredCount } from '@/lib/sm2'
 import { createFSRS, recordResultFSRS, getRetrievability, getDueQueueFSRS } from '@/lib/fsrs'
+import { createFema, recordResultFema, getDueQueueFema, maybeFinishPhaseA, computeFemaMastered, computeFemaDue, FEMA_RUNG_LABEL } from '@/lib/fema'
 import { shuffle, checkRecall, checkExplain, checkGeneration, formatQHtml, getDotColor, correctMsg, wrongMsg, getFullAnswer } from '@/lib/utils'
 import { HIERARCHY, RELATIONS } from '@/lib/relations'
-import { TYPE_LABEL, INITIAL_CARD_STATE, PHASE_LABEL, PHASE_COLOR, DEEP_TYPES, DEEP_BONUS_XP } from '@/lib/constants'
+import { TYPE_LABEL, INITIAL_CARD_STATE, PHASE_LABEL, PHASE_COLOR, DEEP_TYPES, DEEP_BONUS_XP, FEMA_RUNG_MAP } from '@/lib/constants'
 import Header from './Header'
 import ProgressBar from './ProgressBar'
 import StatsBar from './StatsBar'
@@ -21,6 +22,7 @@ import EndScreen from './EndScreen'
 import WelcomeOverlay from './WelcomeOverlay'
 
 const STORAGE_KEY = 'quiz-sm-state'
+const FEMA_STORAGE_KEY = 'quiz-fema-state'
 const ALGORITHM_KEY = 'quiz-algorithm'
 const WELCOME_KEY = 'quiz-welcome-seen'
 
@@ -28,6 +30,7 @@ function loadAlgorithm(): AlgorithmType {
   try {
     const raw = localStorage.getItem(ALGORITHM_KEY)
     if (raw === 'fsrs') return 'fsrs'
+    if (raw === 'fema') return 'fema'
   } catch {}
   return 'sm2'
 }
@@ -54,6 +57,17 @@ function loadState(algorithm: AlgorithmType): { sm: Record<number, CardState>; s
   return { sm: create(ALL_Q), step: 0 }
 }
 
+function loadFemaState(): { fema: FemaState; step: number } {
+  try {
+    const raw = localStorage.getItem(FEMA_STORAGE_KEY)
+    if (raw) {
+      const data = JSON.parse(raw)
+      return { fema: data.fema ?? createFema(ALL_Q), step: data.step ?? 0 }
+    }
+  } catch {}
+  return { fema: createFema(ALL_Q), step: 0 }
+}
+
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 let pendingSm: Record<number, CardState> | null = null
 let pendingStep = 0
@@ -72,14 +86,34 @@ function persistState(sm: Record<number, CardState>, step: number) {
   }, 400)
 }
 
+let femaTimer: ReturnType<typeof setTimeout> | null = null
+let pendingFema: FemaState | null = null
+let pendingFemaStep = 0
+
+function persistFemaState(fema: FemaState, step: number) {
+  pendingFema = fema
+  pendingFemaStep = step
+  if (femaTimer) clearTimeout(femaTimer)
+  femaTimer = setTimeout(() => {
+    try {
+      if (pendingFema) {
+        localStorage.setItem(FEMA_STORAGE_KEY, JSON.stringify({ fema: pendingFema, step: pendingFemaStep }))
+        pendingFema = null
+      }
+    } catch {}
+  }, 400)
+}
+
 export default function QuizContainer() {
   const [algorithm, setAlgorithm] = useState<AlgorithmType>('sm2')
   const algorithmRef = useRef(algorithm)
   const [hydrated, setHydrated] = useState(false)
   const smRef = useRef<Record<number, CardState>>(createSM(ALL_Q))
+  const femaRef = useRef<FemaState>(createFema(ALL_Q))
   const stepRef = useRef(0)
   const queueRef = useRef<number[]>([])
   const [smSnapshot, setSmSnapshot] = useState<Record<number, CardState>>(() => createSM(ALL_Q))
+  const [femaSnapshot, setFemaSnapshot] = useState<FemaState>(() => createFema(ALL_Q))
   const [step, setStep] = useState(0)
   const [showWelcome, setShowWelcome] = useState(false)
   const [currentPhaseIdx, setCurrentPhaseIdx] = useState(0)
@@ -95,13 +129,21 @@ export default function QuizContainer() {
 
   useEffect(() => {
     const alg = loadAlgorithm()
-    const saved = loadState(alg)
+    if (alg === 'fema') {
+      const saved = loadFemaState()
+      femaRef.current = saved.fema
+      stepRef.current = saved.step
+      setFemaSnapshot({...saved.fema})
+      setStep(saved.step)
+    } else {
+      const saved = loadState(alg)
+      smRef.current = saved.sm
+      stepRef.current = saved.step
+      setSmSnapshot({...saved.sm})
+      setStep(saved.step)
+    }
     setAlgorithm(alg)
     algorithmRef.current = alg
-    smRef.current = saved.sm
-    stepRef.current = saved.step
-    setSmSnapshot({...saved.sm})
-    setStep(saved.step)
     perfHistoryRef.current = []
     try { setShowWelcome(!localStorage.getItem(WELCOME_KEY)) } catch {}
     setHydrated(true)
@@ -195,22 +237,30 @@ export default function QuizContainer() {
   )
 
   const dueCount = useMemo(
-    () => computeDueCount(unlockedQuestions, smSnapshot, step),
-    [smSnapshot, step, unlockedQuestions],
+    () => algorithm === 'fema'
+      ? computeFemaDue(femaSnapshot, step)
+      : computeDueCount(unlockedQuestions, smSnapshot, step),
+    [smSnapshot, femaSnapshot, step, unlockedQuestions, algorithm],
   )
   const masteredCount = useMemo(
     () => algorithm === 'fsrs'
       ? unlockedQuestions.filter(q => { const s = smSnapshot[q.id]; return s.seen && s.stability >= 4 }).length
-      : computeMasteredCount(unlockedQuestions, smSnapshot),
-    [smSnapshot, algorithm, unlockedQuestions],
+      : algorithm === 'fema'
+        ? computeFemaMastered(femaSnapshot)
+        : computeMasteredCount(unlockedQuestions, smSnapshot),
+    [smSnapshot, femaSnapshot, algorithm, unlockedQuestions],
   )
   const progressPct = useMemo(
     () => unlockedQuestions.length > 0 ? Math.round((masteredCount / unlockedQuestions.length) * 100) : 0,
     [masteredCount, unlockedQuestions],
   )
 
-  const isMastered = useCallback((s: CardState) => {
+  const isMastered = useCallback((s: CardState, topic?: string) => {
     if (algorithmRef.current === 'fsrs') return s.seen && s.stability >= 4
+    if (algorithmRef.current === 'fema') {
+      const cs = topic ? femaRef.current[topic] : null
+      return cs ? cs.rung >= 3 && cs.encodingDone : false
+    }
     return s.streak >= 2
   }, [])
 
@@ -218,12 +268,19 @@ export default function QuizContainer() {
     return unlockedQuestions.map(q => {
       const s = smSnapshot[q.id]
       let cls = 'recall-seg'
-      if (!s.seen) cls += ' new'
-      else if (isMastered(s)) cls += ' done'
-      else cls += ' due'
+      if (algorithmRef.current === 'fema') {
+        const cs = femaSnapshot[q.topic]
+        if (!cs || !cs.encodingDone) cls += ' new'
+        else if (cs.rung >= 3) cls += ' done'
+        else cls += ' due'
+      } else {
+        if (!s.seen) cls += ' new'
+        else if (isMastered(s, q.topic)) cls += ' done'
+        else cls += ' due'
+      }
       return { cls, title: q.topic }
     })
-  }, [smSnapshot, isMastered, unlockedQuestions])
+  }, [smSnapshot, femaSnapshot, isMastered, unlockedQuestions])
 
   const isRepeat = currentQ
     ? smSnapshot[currentQ.id]?.seen && smSnapshot[currentQ.id]?.streak === 0
@@ -247,6 +304,12 @@ export default function QuizContainer() {
     if (!s) return null
     return getRetrievability(s, step)
   }, [currentQ, smSnapshot, step, algorithm])
+
+  const currentFemaRung = useMemo(() => {
+    if (!currentQ || algorithm !== 'fema') return null
+    const cs = femaSnapshot[currentQ.topic]
+    return cs ? cs.rung : 0
+  }, [currentQ, femaSnapshot, algorithm])
 
   const difficulty: Difficulty = useMemo(() => {
     if (!currentQ) return 'medium'
@@ -287,6 +350,16 @@ export default function QuizContainer() {
       const R = getRetrievability(s, step)
       reasons.push(`Retrievability: ${Math.round(R * 100)}% · Stability: ${Math.round(s.stability)} · Difficulty: ${s.difficulty.toFixed(1)}`)
     }
+    if (algorithm === 'fema') {
+      const cs = femaRef.current[currentQ.topic]
+      if (cs) {
+        const rungLabel = FEMA_RUNG_LABEL[cs.rung]
+        const inEncoding = cs.encodingQueue.length > 0
+        if (inEncoding) reasons.push(`Phase A encoding — building initial memory trace for: ${currentQ.topic}`)
+        else reasons.push(`FEMA rung: ${rungLabel} · streak: ${cs.runStreak}/${2}`)
+        if (cs.wrong > 0) reasons.push(`Regressed back to ${rungLabel} after ${cs.wrong} wrong answer${cs.wrong > 1 ? 's' : ''}`)
+      }
+    }
     const recentWrong = wrongItems.filter(w => w.topic === currentQ.topic).slice(0, 2)
     if (recentWrong.length > 0) {
       recentWrong.forEach(w => reasons.push(`"${w.topic}" was answered incorrectly`))
@@ -295,7 +368,7 @@ export default function QuizContainer() {
       reasons.push('Scheduled for review — optimal timing for retention')
     }
     return reasons
-  }, [currentQ, wrongItems, smSnapshot, algorithm, step])
+  }, [currentQ, wrongItems, smSnapshot, algorithm, step, femaSnapshot])
 
   const relatedTopics = useMemo(() => {
     if (!currentQ) return []
@@ -376,6 +449,13 @@ export default function QuizContainer() {
 
   const buildQueue = useCallback(() => {
     const qs = activeQuestionsRef.current
+
+    // ── FEMA queue ──────────────────────────────────────────────────────────
+    if (algorithmRef.current === 'fema') {
+      queueRef.current = getDueQueueFema(qs, femaRef.current, stepRef.current)
+      return
+    }
+
     const base = algorithmRef.current === 'fsrs'
       ? getDueQueueFSRS(qs, smRef.current, stepRef.current)
       : getDueQueue(qs, smRef.current, stepRef.current)
@@ -499,11 +579,17 @@ export default function QuizContainer() {
   const handleAlgorithmChange = useCallback((alg: AlgorithmType) => {
     if (alg === algorithm) return
     try { localStorage.setItem(ALGORITHM_KEY, alg) } catch {}
-    const create = alg === 'fsrs' ? createFSRS : createSM
-    smRef.current = create(ALL_Q)
-    stepRef.current = 0
+    if (alg === 'fema') {
+      femaRef.current = createFema(ALL_Q)
+      stepRef.current = 0
+      try { localStorage.removeItem(FEMA_STORAGE_KEY) } catch {}
+    } else {
+      const create = alg === 'fsrs' ? createFSRS : createSM
+      smRef.current = create(ALL_Q)
+      stepRef.current = 0
+      try { localStorage.removeItem(STORAGE_KEY) } catch {}
+    }
     perfHistoryRef.current = []
-    try { localStorage.removeItem(STORAGE_KEY) } catch {}
     setCurrentPhaseIdx(0)
     setPhaseJustUnlocked(false)
     setAlgorithm(alg)
@@ -517,12 +603,27 @@ export default function QuizContainer() {
   }, [algorithm, nextCard])
 
   const recordResultFn = useCallback(
-    (qid: number, correct: boolean) =>
-      algorithm === 'fsrs'
+    (qid: number, correct: boolean) => {
+      if (algorithm === 'fema') {
+        const qs = activeQuestionsRef.current
+        maybeFinishPhaseA(femaRef.current, qid, qs, stepRef.current)
+        const next = recordResultFema(femaRef.current, qs, stepRef.current, qid, correct)
+        persistFemaState(femaRef.current, next)
+        setFemaSnapshot({...femaRef.current})
+        return next
+      }
+      const next = algorithm === 'fsrs'
         ? recordResultFSRS(smRef.current, stepRef.current, qid, correct)
-        : recordResult(smRef.current, stepRef.current, qid, correct),
+        : recordResult(smRef.current, stepRef.current, qid, correct)
+      persistState(smRef.current, next)
+      return next
+    },
     [algorithm],
   )
+
+  // Snapshot sync — after FEMA recordResultFn already sets femaSnapshot, but
+  // sm/fsrs snapshot is updated via setSessionDone → useEffect below.
+  // No extra work needed here.
 
   const logWrong = useCallback((q: Question, user: string, correct: string) => {
     setWrongItems(prev => [...prev, { topic: q.topic, q: q.q.substring(0, 80) + '…', user, correct }])
@@ -548,7 +649,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, correct)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, logWrong])
 
   const handleTF = useCallback((selected: boolean) => {
@@ -571,7 +671,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, correct)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, logWrong])
 
   const handleFill = useCallback(() => {
@@ -602,7 +701,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, allCorrect)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, fillValues, logWrong])
 
   const handleMatch = useCallback(() => {
@@ -631,7 +729,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, allCorrect)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, matchValues, logWrong])
 
   const handleRecall = useCallback(() => {
@@ -654,7 +751,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, correct)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, recallValue, logWrong])
 
   const handleExplain = useCallback(() => {
@@ -678,7 +774,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, allFound)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, explainValue, logWrong])
 
   const handleAbstract = useCallback(() => {
@@ -702,7 +797,6 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, ok)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, abstractValue, logWrong])
 
   const handleAnalogy = useCallback(() => {
@@ -725,15 +819,19 @@ export default function QuizContainer() {
     setAfterAnswerData(ad)
     stepRef.current = recordResultFn(currentQ.id, ok)
     setSessionDone(d => d + 1)
-    persistState(smRef.current, stepRef.current)
   }, [currentQ, answered, analogyValue, logWrong])
 
   const restart = useCallback(() => {
-    const create = algorithm === 'fsrs' ? createFSRS : createSM
-    smRef.current = create(ALL_Q)
+    if (algorithm === 'fema') {
+      femaRef.current = createFema(ALL_Q)
+      try { localStorage.removeItem(FEMA_STORAGE_KEY) } catch {}
+    } else {
+      const create = algorithm === 'fsrs' ? createFSRS : createSM
+      smRef.current = create(ALL_Q)
+      try { localStorage.removeItem(STORAGE_KEY) } catch {}
+    }
     stepRef.current = 0
     perfHistoryRef.current = []
-    try { localStorage.removeItem(STORAGE_KEY) } catch {}
     try { localStorage.removeItem(ALGORITHM_KEY) } catch {}
     setCurrentPhaseIdx(0)
     setPhaseJustUnlocked(false)
@@ -892,6 +990,7 @@ export default function QuizContainer() {
           retrievability={currentRetrievability}
           algorithm={algorithm}
           targetDifficulty={targetDifficulty}
+          femaRung={currentFemaRung}
         />
       )}
 

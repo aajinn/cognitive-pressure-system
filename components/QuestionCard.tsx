@@ -2,6 +2,7 @@
 
 import type { Question, McqHighlight, TfHighlight, FeedbackState, Difficulty, AlgorithmType } from '@/lib/types'
 import { TYPE_LABEL } from '@/lib/constants'
+import { FEMA_RUNG_LABEL } from '@/lib/fema'
 import { formatQHtml } from '@/lib/utils'
 
 import MatchInput from './MatchInput'
@@ -70,6 +71,8 @@ interface QuestionCardProps {
   retrievability: number | null
   algorithm: AlgorithmType
   targetDifficulty: Difficulty
+  /** FEMA: current rung index for this topic (0–3), null when not FEMA */
+  femaRung: number | null
   teachbackValue: string
   onTeachbackChange: (v: string) => void
 }
@@ -123,6 +126,11 @@ export default function QuestionCard(props: QuestionCardProps) {
           {props.algorithm === 'fsrs' && props.retrievability !== null && (
             <span className={`retrievability-ind ${props.retrievability > 0.7 ? 'high' : props.retrievability > 0.3 ? 'mid' : 'low'}`}>
               R {Math.round(props.retrievability * 100)}%
+            </span>
+          )}
+          {props.algorithm === 'fema' && props.femaRung !== null && (
+            <span className={`fema-rung-ind rung-${props.femaRung}`}>
+              {FEMA_RUNG_LABEL[props.femaRung as 0 | 1 | 2 | 3]}
             </span>
           )}
         </div>

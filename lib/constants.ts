@@ -1,4 +1,4 @@
-import type { Phase, QType } from './types'
+import type { Phase, QType, FemaRung } from './types'
 
 export const END_MSGS: [number, string][] = [
   [90, 'Excellent. Almost everything is mastered.'],
@@ -68,6 +68,30 @@ export const SHORT_TYPE_LABEL: Record<QType, string> = {
   transfer: 'Trf.',
   analogy: 'Alg.',
 }
+
+// ── FEMA-1 constants ────────────────────────────────────────────────────────
+// How many consecutive correct answers are needed to climb one rung
+export const FEMA_RUNG_THRESHOLD = 2
+
+// Intervals (in steps) after mastering each rung before the concept is re-shown
+export const FEMA_INTERVALS: Record<number, number> = { 0: 1, 1: 3, 2: 7, 3: 14 }
+
+// Map every question type to a ladder rung
+export const FEMA_RUNG_MAP: Record<QType, FemaRung> = {
+  mcq:         0,
+  tf:          0,
+  fill:        1,
+  match:       1,
+  recall:      1,
+  explain:     2,
+  reconstruct: 2,
+  abstract:    2,
+  transfer:    3,
+  analogy:     3,
+}
+
+// How many questions to show per Phase-A rung during same-session encoding
+export const FEMA_PHASE_A_PER_RUNG: Record<number, number> = { 0: 2, 1: 2, 2: 1 }
 
 export const INITIAL_CARD_STATE = {
   interval: 0,
