@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 eslint-issues
+
+.codegraph
+.agents
+
+skills-lock.json
+.vscode
