@@ -51,9 +51,9 @@ export const PHASE_LABEL: Record<Phase, string> = {
 
 export const PHASE_COLOR: Record<Phase, string> = {
   core: 'var(--accent)',
-  intermediate: 'var(--green)',
-  advanced: 'var(--amber)',
-  transfer: 'var(--red)',
+  intermediate: 'var(--accent)',
+  advanced: 'var(--accent)',
+  transfer: 'var(--accent)',
 }
 
 export const SHORT_TYPE_LABEL: Record<QType, string> = {

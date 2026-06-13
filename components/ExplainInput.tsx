@@ -27,7 +27,7 @@ export default function ExplainInput({ value, keyTerms, disabled, keyTermHighlig
             <span
               key={i}
               className={`badge ${keyTermHighlights[i] === null ? 'badge-type' : keyTermHighlights[i] ? 'badge-repeat' : 'badge-topic'}`}
-              style={keyTermHighlights[i] === null ? {} : keyTermHighlights[i] ? { background: '#0d2018', color: 'var(--green)', border: '1px solid var(--green)' } : { background: '#200d0d', color: 'var(--red)', border: '1px solid var(--red)' }}
+              style={keyTermHighlights[i] === null ? {} : keyTermHighlights[i] ? { background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid var(--green)' } : { background: 'rgba(239,68,68,0.08)', color: 'var(--red)', border: '1px solid var(--red)' }}
             >
               {kt} {keyTermHighlights[i] === null ? '— pending' : keyTermHighlights[i] ? '✓' : '✗'}
             </span>
