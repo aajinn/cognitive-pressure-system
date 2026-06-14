@@ -139,11 +139,7 @@ export default function QuestionCard(props: QuestionCardProps) {
       {/* ── question text ── */}
       <div className="q-text-premium" dangerouslySetInnerHTML={{ __html: formatQHtml(question) }} />
 
-      {question.hint && !answered && (
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, fontFamily: 'var(--font-dm-mono), DM Mono, monospace' }}>
-          Hint: {question.hint}
-        </div>
-      )}
+
 
       {/* ── context panel ── */}
       {!answered && props.contextReasons.length > 0 && (
